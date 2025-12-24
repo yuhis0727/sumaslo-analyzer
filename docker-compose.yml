@@ -1,0 +1,54 @@
+services:
+  api:
+    build: ./docker/dev
+    command: python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8080
+    volumes:
+      - ./backend/.flake8:/workspace/.flake8
+      - ./backend/.env:/workspace/.env
+      - ./backend/alembic.ini.dev:/workspace/alembic.ini
+      - ./backend/alembic:/workspace/alembic:consistent
+      - ./backend/src/:/workspace/src:consistent
+      - ./backend/tests/:/workspace/tests:consistent
+      - ./docker/scripts/:/workspace/scripts
+  db:
+    image: mysql:8.0
+    platform: linux/amd64
+    volumes:
+      - db-store:/var/lib/mysql  # MySQLデータを永続化するためのボリューム
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    environment:
+      - MYSQL_DATABASE=f2t
+      - MYSQL_USER=db-user
+      - MYSQL_PASSWORD=db-pass
+      - MYSQL_ROOT_PASSWORD=password
+      - TZ=Asia/Tokyo
+    ports:
+      - 13306:3306
+
+  web:
+    image: node:20.17.0
+    working_dir: /app
+    volumes:
+      - ./frontend:/app:consistent
+      - node_modules:/app/node_modules
+    command: sh -c "yarn install && yarn dev"
+    environment:
+      - NODE_ENV=development
+      - TZ=Asia/Tokyo
+  nginx:
+    image: nginx:latest
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:consistent
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - web
+      - api
+    environment:
+      - NODE_ENV=development
+volumes:
+  db-store:
+    driver: local
+  node_modules:

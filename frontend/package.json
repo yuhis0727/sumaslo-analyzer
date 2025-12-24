@@ -1,0 +1,35 @@
+{
+  "name": "osa-seller",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "npx next build --experimental-build-mode compile",
+    "start": "next start",
+    "lint": "yarn eslint components/ app/"
+  },
+  "dependencies": {
+    "@nivo/line": "^0.84.0",
+    "@primer/octicons-react": "^19.9.0",
+    "@primer/react": "^36.12.0",
+    "@types/react": "18.2.46",
+    "autoprefixer": "^10.4.16",
+    "axios": "^1.7.3",
+    "cookies-next": "^4.2.1",
+    "next": "^14.2.3",
+    "postcss": "^8.4.32",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-icons": "^5.2.1",
+    "styled-components": "5",
+    "tailwindcss": "^3.4.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.11.0",
+    "@types/eslint__js": "^8.42.3",
+    "@types/node": "^20.10.6",
+    "eslint": "^9.11.0",
+    "typescript": "^5.6.2",
+    "typescript-eslint": "^8.6.0"
+  }
+}

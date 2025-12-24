@@ -1,0 +1,13 @@
+services:
+  api:
+    build: 
+      dockerfile: Dockerfile.prod
+    command: python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8080
+    volumes:
+      - ./backend/.flake8:/workspace/.flake8
+      - ./backend/.env:/workspace/.env
+      - ./backend/alembic.ini.stage:/workspace/alembic.ini
+      - ./backend/alembic:/workspace/alembic:consistent
+      - ./backend/src/:/workspace/src:consistent
+      - ./backend/tests/:/workspace/tests:consistent
+      - ./docker/scripts/:/workspace/scripts

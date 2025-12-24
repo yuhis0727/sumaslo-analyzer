@@ -1,0 +1,23 @@
+name: backend
+
+on: [push]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+    - name: define run url
+      run: echo "ACTION_URL=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" >> $GITHUB_ENV
+    - uses: actions/checkout@v4
+    - name: Copy .env.sample to .env
+      run: cp backend/.env.sample backend/.env
+    - name: Docker Build
+      run: docker compose build
+    - name: Docker Compose Up
+      run: docker compose up -d
+    - name: Run Pytest
+      run: |
+        docker compose exec -T api python -m pytest tests/validator --it
+    - name: Run Lint
+      run: |
+        docker compose exec -T api python3 -m flake8 --ignore=F821,E722,W503,E402 src/ tests/

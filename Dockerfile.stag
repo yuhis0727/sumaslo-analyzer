@@ -1,0 +1,29 @@
+# ベースイメージの設定
+FROM python:3.12.0
+
+# 環境変数を設定 (key=value 形式を使用)
+ENV PYTHON_ENV=DEV
+
+# 作業ディレクトリを設定
+WORKDIR /workspace
+
+# アプリケーションのソースコードをコピー
+COPY docker/prod/requirements.txt .
+
+# 必要なファイルとディレクトリをコピー
+COPY backend/alembic.ini.prod ./alembic.ini
+COPY backend/.env.stage.sample ./.env
+COPY backend/alembic/ ./alembic/
+COPY backend/src/ ./src/
+
+RUN apt update
+RUN apt install -y default-mysql-client
+
+# pipをアップグレード
+RUN pip install -U pip
+
+# 必要なパッケージをインストール (BuildKitの使用を確認)
+RUN pip3 install -r requirements.txt
+
+# アプリケーションの起動
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "80"]

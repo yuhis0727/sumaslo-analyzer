@@ -1,0 +1,7 @@
+pytest==8.0.0
+requests==2.31.0
+httpx==0.26.0
+pytest-it==0.1.5
+flake8==7.1.1
+black==24.8.0
+autoflake==2.3.1
