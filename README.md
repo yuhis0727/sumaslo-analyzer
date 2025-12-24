@@ -65,8 +65,8 @@ cp frontend/.env.local.sample frontend/.env.local
 3. hostsファイルを設定 (`/etc/hosts` または `C:\Windows\System32\drivers\etc\hosts`)
 
 ```
-127.0.0.1 f2t.dev
-127.0.0.1 api.f2t.dev
+127.0.0.1 sumaslo-analyzer.dev
+127.0.0.1 api.sumaslo-analyzer.dev
 ```
 
 4. Dockerコンテナを起動
@@ -83,8 +83,8 @@ docker compose exec api alembic upgrade head
 
 ### アクセス
 
-- フロントエンド: https://f2t.dev
-- API ドキュメント: https://api.f2t.dev/docs
+- フロントエンド: http://sumaslo-analyzer.dev
+- API ドキュメント: http://api.sumaslo-analyzer.dev/docs
 - データベース: localhost:13306
 
 ## 使い方
@@ -94,7 +94,7 @@ docker compose exec api alembic upgrade head
 APIまたはフロントエンドから店舗情報を登録します。
 
 ```bash
-curl -X POST https://api.f2t.dev/api/v1/slots/stores \
+curl -X POST http://api.sumaslo-analyzer.dev/api/v1/slots/stores \
   -H "Content-Type: application/json" \
   -d '{
     "name": "店舗名",
@@ -108,7 +108,7 @@ curl -X POST https://api.f2t.dev/api/v1/slots/stores \
 登録した店舗のデータを取得します。
 
 ```bash
-curl -X POST https://api.f2t.dev/api/v1/slots/scrape/{store_id}
+curl -X POST http://api.sumaslo-analyzer.dev/api/v1/slots/scrape/{store_id}
 ```
 
 ### 3. データを分析
@@ -116,12 +116,12 @@ curl -X POST https://api.f2t.dev/api/v1/slots/scrape/{store_id}
 AIが店舗データを分析し、高設定台の確率を予測します。
 
 ```bash
-curl -X POST https://api.f2t.dev/api/v1/slots/analyze/{store_id}
+curl -X POST http://api.sumaslo-analyzer.dev/api/v1/slots/analyze/{store_id}
 ```
 
 ### 4. フロントエンドで確認
 
-https://f2t.dev/analysis にアクセスして、視覚的に分析結果を確認できます。
+http://sumaslo-analyzer.dev/analysis にアクセスして、視覚的に分析結果を確認できます。
 
 ## API エンドポイント
 

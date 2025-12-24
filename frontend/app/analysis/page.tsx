@@ -39,7 +39,7 @@ export default function AnalysisPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://api.f2t.dev";
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://api.sumaslo-analyzer.dev";
 
   useEffect(() => {
     fetchStores();

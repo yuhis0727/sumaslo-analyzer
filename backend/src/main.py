@@ -19,8 +19,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://f2t.dev",
-        "https://f2t.com",
+        "http://sumaslo-analyzer.dev",
+        "https://sumaslo-analyzer.dev",
+        "http://localhost",
+        "https://localhost",
     ],
     allow_credentials=True,
     allow_methods=["*"],
