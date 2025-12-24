@@ -49,4 +49,3 @@ torch==2.5.1
 scikit-learn==1.6.0
 celery==5.4.0
 redis==5.2.0
-requests==2.32.3

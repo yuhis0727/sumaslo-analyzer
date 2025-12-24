@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
-from backend.src.app.models import Base
+from src.app.models import Base
 
 
 class Store(Base):

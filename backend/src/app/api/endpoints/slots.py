@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from backend.src.app.models import get_db
-from backend.src.app.models.slot_data import Store, SlotMachine, Prediction, ScrapingLog
-from backend.src.app.services.scraper import AnasloScraper
-from backend.src.app.services.ai_analyzer import SlotAIAnalyzer
+from src.app.models import get_db
+from src.app.models.slot_data import Store, SlotMachine, Prediction, ScrapingLog
+from src.app.services.scraper import AnasloScraper
+from src.app.services.ai_analyzer import SlotAIAnalyzer
 
 router = APIRouter()
 

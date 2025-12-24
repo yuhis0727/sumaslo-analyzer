@@ -15,7 +15,7 @@ fileConfig(config.config_file_name)
 from importlib import import_module
 from pathlib import Path
 
-from src.app.models.base import Base
+from src.app.models import Base
 
 def import_migration_module(module):
     """マイグレーションに含めたいモジュールをimport."""
