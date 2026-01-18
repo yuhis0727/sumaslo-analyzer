@@ -1,13 +1,13 @@
 from datetime import datetime
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.app.models import get_db
-from src.app.models.slot_data import Store, SlotMachine, Prediction, ScrapingLog
-from src.app.services.scraper import AnasloScraper
+from src.app.models.slot_data import Prediction, ScrapingLog, SlotMachine, Store
 from src.app.services.ai_analyzer import SlotAIAnalyzer
+from src.app.services.scraper import AnasloScraper
 
 router = APIRouter()
 
@@ -15,15 +15,15 @@ router = APIRouter()
 # Pydantic スキーマ
 class StoreCreate(BaseModel):
     name: str = Field(..., description="店舗名")
-    area: Optional[str] = Field(None, description="エリア")
+    area: str | None = Field(None, description="エリア")
     anaslo_url: str = Field(..., description="アナスロのURL")
 
 
 class StoreResponse(BaseModel):
     id: int
     name: str
-    area: Optional[str]
-    anaslo_url: Optional[str]
+    area: str | None
+    anaslo_url: str | None
     created_at: datetime
 
     class Config:
@@ -33,11 +33,11 @@ class StoreResponse(BaseModel):
 class MachineData(BaseModel):
     machine_number: int
     model_name: str
-    game_count: Optional[int]
-    big_bonus: Optional[int]
-    regular_bonus: Optional[int]
-    art_count: Optional[int]
-    total_difference: Optional[int]
+    game_count: int | None
+    big_bonus: int | None
+    regular_bonus: int | None
+    art_count: int | None
+    total_difference: int | None
 
 
 class PredictionResponse(BaseModel):
@@ -46,8 +46,8 @@ class PredictionResponse(BaseModel):
     prediction_date: datetime
     high_setting_probability: float
     confidence_score: float
-    recommended_machines: Optional[str]
-    analysis_details: Optional[str]
+    recommended_machines: str | None
+    analysis_details: str | None
 
     class Config:
         from_attributes = True
@@ -57,7 +57,7 @@ class AnalysisResult(BaseModel):
     store_name: str
     high_setting_probability: float
     confidence_score: float
-    recommended_machines: List[int]
+    recommended_machines: list[int]
     analysis_details: dict
 
 
@@ -66,7 +66,7 @@ class AnalysisResult(BaseModel):
 async def create_store(store: StoreCreate, db: Session = Depends(get_db)):
     """店舗を登録"""
     db_store = Store(
-        name=store.name, area=store.area, anaslo_url=store.anaslo_url
+        name=store.name, area=store.area, anaslo_url=store.anaslo_url,
     )
     db.add(db_store)
     db.commit()
@@ -74,9 +74,9 @@ async def create_store(store: StoreCreate, db: Session = Depends(get_db)):
     return db_store
 
 
-@router.get("/stores", response_model=List[StoreResponse])
+@router.get("/stores", response_model=list[StoreResponse])
 async def get_stores(
-    skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
+    skip: int = 0, limit: int = 100, db: Session = Depends(get_db),
 ):
     """店舗一覧を取得"""
     stores = db.query(Store).offset(skip).limit(limit).all()
@@ -94,7 +94,7 @@ async def get_store(store_id: int, db: Session = Depends(get_db)):
 
 @router.post("/scrape/{store_id}")
 async def scrape_store_data(
-    store_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+    store_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db),
 ):
     """店舗データをスクレイピング"""
     store = db.query(Store).filter(Store.id == store_id).first()
@@ -110,7 +110,7 @@ async def scrape_store_data(
 async def execute_scraping(store_id: int, url: str, db: Session):
     """スクレイピング実行(バックグラウンド処理)"""
     log = ScrapingLog(
-        store_id=store_id, status="running", started_at=datetime.now()
+        store_id=store_id, status="running", started_at=datetime.now(),
     )
     db.add(log)
     db.commit()
@@ -204,9 +204,9 @@ async def analyze_store(store_id: int, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/predictions/{store_id}", response_model=List[PredictionResponse])
+@router.get("/predictions/{store_id}", response_model=list[PredictionResponse])
 async def get_predictions(
-    store_id: int, limit: int = 10, db: Session = Depends(get_db)
+    store_id: int, limit: int = 10, db: Session = Depends(get_db),
 ):
     """店舗の予測履歴を取得"""
     predictions = (
@@ -221,7 +221,7 @@ async def get_predictions(
 
 @router.get("/scraping-logs/{store_id}")
 async def get_scraping_logs(
-    store_id: int, limit: int = 10, db: Session = Depends(get_db)
+    store_id: int, limit: int = 10, db: Session = Depends(get_db),
 ):
     """スクレイピングログを取得"""
     logs = (

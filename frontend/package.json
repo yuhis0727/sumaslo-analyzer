@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "npx next build --experimental-build-mode compile",
     "start": "next start",
-    "lint": "yarn eslint components/ app/"
+    "lint": "yarn eslint app/ --ignore-pattern '*.gitkeep'"
   },
   "dependencies": {
     "@nivo/line": "^0.84.0",

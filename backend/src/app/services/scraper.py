@@ -1,13 +1,12 @@
 import re
 import time
 from datetime import datetime
-from typing import List, Dict, Optional
-import requests
-from bs4 import BeautifulSoup
+
 import undetected_chromedriver as uc
+from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 
 class AnasloScraper:
@@ -40,10 +39,9 @@ class AnasloScraper:
         self,
         list_url: str,
         target_date: str,
-        wait_for_cloudflare: int = 15
-    ) -> Dict:
-        """
-        2段階アクセスで店舗の日付別データを取得（Cloudflare対応）
+        wait_for_cloudflare: int = 15,
+    ) -> dict:
+        """2段階アクセスで店舗の日付別データを取得（Cloudflare対応）
 
         Args:
             list_url: データ一覧ページのURL
@@ -52,6 +50,7 @@ class AnasloScraper:
 
         Returns:
             店舗データと台データを含む辞書
+
         """
         try:
             self._setup_driver()
@@ -61,7 +60,7 @@ class AnasloScraper:
             time.sleep(wait_for_cloudflare)
 
             WebDriverWait(self.driver, 20).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
+                EC.presence_of_element_located((By.TAG_NAME, "body")),
             )
 
             # Step 2: 日付リンクをクリック
@@ -73,8 +72,10 @@ class AnasloScraper:
             # 広告オーバーレイを非表示にする
             try:
                 overlay = self.driver.find_element(By.ID, "overlay_ads_area")
-                self.driver.execute_script("arguments[0].style.display = 'none';", overlay)
-            except:
+                self.driver.execute_script(
+                    "arguments[0].style.display = 'none';", overlay
+                )
+            except Exception:
                 pass
 
             # 現在のウィンドウハンドルを保存
@@ -111,13 +112,12 @@ class AnasloScraper:
             }
 
         except Exception as e:
-            raise Exception(f"スクレイピングエラー: {str(e)}")
+            raise Exception(f"スクレイピングエラー: {e!s}")
         finally:
             self._close_driver()
 
-    def scrape_store_data(self, store_url: str, wait_for_cloudflare: int = 10) -> Dict:
-        """
-        店舗のページから台データを取得（直接アクセス版 - Cloudflare認証済みの場合のみ）
+    def scrape_store_data(self, store_url: str, wait_for_cloudflare: int = 10) -> dict:
+        """店舗のページから台データを取得（直接アクセス版）
 
         Args:
             store_url: アナスロの店舗URL
@@ -125,6 +125,7 @@ class AnasloScraper:
 
         Returns:
             店舗データと台データを含む辞書
+
         """
         try:
             self._setup_driver()
@@ -135,7 +136,7 @@ class AnasloScraper:
 
             # ページの読み込みを待機
             WebDriverWait(self.driver, 20).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
+                EC.presence_of_element_located((By.TAG_NAME, "body")),
             )
 
             # ページソースを取得
@@ -156,7 +157,7 @@ class AnasloScraper:
             }
 
         except Exception as e:
-            raise Exception(f"スクレイピングエラー: {str(e)}")
+            raise Exception(f"スクレイピングエラー: {e!s}")
         finally:
             self._close_driver()
 
@@ -176,7 +177,7 @@ class AnasloScraper:
                 return title_part
         return "不明な店舗"
 
-    def _extract_machines_data(self, soup: BeautifulSoup) -> List[Dict]:
+    def _extract_machines_data(self, soup: BeautifulSoup) -> list[dict]:
         """台データを抽出（アナスロの日付詳細ページ用）"""
         machines = []
 
@@ -202,7 +203,7 @@ class AnasloScraper:
 
         return machines
 
-    def _parse_machine_row(self, cols) -> Optional[Dict]:
+    def _parse_machine_row(self, cols) -> dict | None:
         """台データの行をパース（アナスロ形式）"""
         try:
             # アナスロのカラム順序:
@@ -212,8 +213,12 @@ class AnasloScraper:
             machine_number = self._extract_number(cols[1].text)
             game_count = self._extract_number(cols[2].text)
             total_difference = self._extract_number(cols[3].text)
-            big_bonus = self._extract_number(cols[4].text) if len(cols) > 4 else None
-            regular_bonus = self._extract_number(cols[5].text) if len(cols) > 5 else None
+            big_bonus = (
+                self._extract_number(cols[4].text) if len(cols) > 4 else None
+            )
+            regular_bonus = (
+                self._extract_number(cols[5].text) if len(cols) > 5 else None
+            )
 
             # 確率データ（オプション）
             combined_rate = cols[6].text.strip() if len(cols) > 6 else None
@@ -236,7 +241,7 @@ class AnasloScraper:
             print(f"台データのパースエラー: {e}")
             return None
 
-    def _extract_number(self, text: str) -> Optional[int]:
+    def _extract_number(self, text: str) -> int | None:
         """テキストから数値を抽出"""
         if not text:
             return None
@@ -250,9 +255,8 @@ class AnasloScraper:
                 return None
         return None
 
-    def search_stores(self, area: str = None, keyword: str = None) -> List[Dict]:
-        """
-        店舗を検索
+    def search_stores(self, area: str = None, keyword: str = None) -> list[dict]:
+        """店舗を検索
 
         Args:
             area: エリア名
@@ -260,6 +264,7 @@ class AnasloScraper:
 
         Returns:
             店舗情報のリスト
+
         """
         # アナスロの検索機能を使用して店舗を検索
         # 実装は実際のサイト構造に応じて調整

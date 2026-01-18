@@ -1,15 +1,18 @@
-"""
-AnasloScraperクラスのユニットテスト
+"""AnasloScraperクラスのユニットテスト
 
 このテストファイルはスクレイパーの内部ロジック（パース処理等）をテストします。
 実際のウェブスクレイピングは外部サービスに依存するため、モックを使用します。
 """
+import os
+import sys
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 from bs4 import BeautifulSoup
 
-import sys
-sys.path.insert(0, 'backend/src')
+# Docker環境とローカル環境の両方に対応
+src_path = os.path.join(os.path.dirname(__file__), "..", "src")
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
 from app.services.scraper import AnasloScraper
 
@@ -69,7 +72,7 @@ class TestExtractStoreName:
         """標準的なタイトル形式から店舗名を抽出できる"""
         html = """
         <html>
-        <head><title>2026-01-14 マルハンメガシティ2000蒲田7-data | アナスロ</title></head>
+        <head><title>2026-01-14 マルハン蒲田7-data | アナスロ</title></head>
         <body></body>
         </html>
         """

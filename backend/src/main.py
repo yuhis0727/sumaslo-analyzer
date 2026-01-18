@@ -1,8 +1,5 @@
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
 from src.app.api.endpoints.health_check import health_check
 from src.app.api.endpoints.slots import router as slots_router
