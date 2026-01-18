@@ -9,6 +9,7 @@ services:
       - ./backend/alembic:/workspace/alembic:consistent
       - ./backend/src/:/workspace/src:consistent
       - ./backend/tests/:/workspace/tests:consistent
+      - ./backend/pyproject.toml:/workspace/pyproject.toml
       - ./docker/scripts/:/workspace/scripts
   db:
     image: mysql:8.0
