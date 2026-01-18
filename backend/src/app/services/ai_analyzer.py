@@ -1,12 +1,11 @@
-import json
-from datetime import datetime, timedelta
-from typing import List, Dict, Tuple
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
-from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from torch import nn
 
 
 class SlotDataPreprocessor:
@@ -15,15 +14,15 @@ class SlotDataPreprocessor:
     def __init__(self):
         self.scaler = StandardScaler()
 
-    def prepare_features(self, machines_data: List[Dict]) -> pd.DataFrame:
-        """
-        機械学習用の特徴量を準備
+    def prepare_features(self, machines_data: list[dict]) -> pd.DataFrame:
+        """機械学習用の特徴量を準備
 
         Args:
             machines_data: 台データのリスト
 
         Returns:
             特徴量のDataFrame
+
         """
         df = pd.DataFrame(machines_data)
 
@@ -77,7 +76,7 @@ class SettingPredictionModel(nn.Module):
     """設定予測用のニューラルネットワークモデル"""
 
     def __init__(self, input_size: int, hidden_size: int = 64):
-        super(SettingPredictionModel, self).__init__()
+        super().__init__()
         self.layer1 = nn.Linear(input_size, hidden_size)
         self.relu1 = nn.ReLU()
         self.dropout1 = nn.Dropout(0.3)
@@ -122,10 +121,9 @@ class SlotAIAnalyzer:
             self.load_model(model_path)
 
     def analyze_store(
-        self, store_data: Dict, historical_data: List[Dict] = None
-    ) -> Dict:
-        """
-        店舗データを分析して高設定台の確率を予測
+        self, store_data: dict, historical_data: list[dict] = None,
+    ) -> dict:
+        """店舗データを分析して高設定台の確率を予測
 
         Args:
             store_data: 店舗の台データ
@@ -133,6 +131,7 @@ class SlotAIAnalyzer:
 
         Returns:
             分析結果
+
         """
         machines = store_data.get("machines", [])
 
@@ -160,7 +159,7 @@ class SlotAIAnalyzer:
 
         # 総合評価
         high_setting_prob = self._calculate_overall_probability(
-            statistical_analysis, ai_prediction
+            statistical_analysis, ai_prediction,
         )
 
         # 信頼度スコアの計算
@@ -178,7 +177,7 @@ class SlotAIAnalyzer:
             },
         }
 
-    def _statistical_analysis(self, machines: List[Dict]) -> Dict:
+    def _statistical_analysis(self, machines: list[dict]) -> dict:
         """統計的分析を実施"""
         df = pd.DataFrame(machines)
 
@@ -192,7 +191,7 @@ class SlotAIAnalyzer:
             "positive_machines_count": int(
                 (df["total_difference"] > 0).sum()
                 if "total_difference" in df.columns
-                else 0
+                else 0,
             ),
             "high_performers": [],
         }
@@ -207,8 +206,8 @@ class SlotAIAnalyzer:
         return analysis
 
     def _select_recommended_machines(
-        self, machines: List[Dict], top_n: int = 5
-    ) -> List[int]:
+        self, machines: list[dict], top_n: int = 5,
+    ) -> list[int]:
         """推奨台を選定"""
         df = pd.DataFrame(machines)
 
@@ -240,7 +239,7 @@ class SlotAIAnalyzer:
             return None
 
     def _calculate_overall_probability(
-        self, statistical: Dict, ai_prediction: float = None
+        self, statistical: dict, ai_prediction: float = None,
     ) -> float:
         """総合的な高設定確率を計算"""
         # 統計的分析から基本確率を算出
@@ -253,7 +252,8 @@ class SlotAIAnalyzer:
         )
 
         # 簡易的な確率計算
-        statistical_prob = min(1.0, max(0.0, (avg_diff / 1000) * 0.5 + positive_ratio * 0.5))
+        diff_factor = (avg_diff / 1000) * 0.5
+        statistical_prob = min(1.0, max(0.0, diff_factor + positive_ratio * 0.5))
 
         # AI予測がある場合は加重平均
         if ai_prediction is not None:
@@ -262,7 +262,7 @@ class SlotAIAnalyzer:
         return statistical_prob
 
     def _calculate_confidence(
-        self, machine_count: int, historical_data: List = None
+        self, machine_count: int, historical_data: list = None,
     ) -> float:
         """信頼度スコアを計算"""
         # データ数に基づく基本信頼度
@@ -275,7 +275,7 @@ class SlotAIAnalyzer:
 
         return base_confidence
 
-    def train_model(self, training_data: List[Dict], epochs: int = 100):
+    def train_model(self, training_data: list[dict], epochs: int = 100):
         """モデルを学習"""
         # 訓練データの準備
         X = []
@@ -291,7 +291,7 @@ class SlotAIAnalyzer:
 
         # データ分割
         X_train, X_val, y_train, y_val = train_test_split(
-            X, y, test_size=0.2, random_state=42
+            X, y, test_size=0.2, random_state=42,
         )
 
         # モデルの初期化

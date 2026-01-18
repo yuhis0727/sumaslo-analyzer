@@ -19,11 +19,11 @@ interface AnalysisResult {
       average_game_count: number;
       average_difference: number;
       positive_machines_count: number;
-      high_performers: Array<{
+      high_performers: {
         machine_number: number;
         model_name: string;
         total_difference: number;
-      }>;
+      }[];
     };
     total_machines: number;
     analysis_date: string;

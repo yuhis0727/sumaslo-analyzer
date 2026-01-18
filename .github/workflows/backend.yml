@@ -17,7 +17,7 @@ jobs:
       run: docker compose up -d
     - name: Run Pytest
       run: |
-        docker compose exec -T api python -m pytest tests/validator --it
+        docker compose exec -T api python -m pytest tests/ -v
     - name: Run Lint
       run: |
-        docker compose exec -T api python3 -m flake8 --ignore=F821,E722,W503,E402 src/ tests/
+        docker compose exec -T api python3 -m ruff check src/ tests/ --config pyproject.toml

@@ -1,11 +1,22 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text
+
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
+
 from src.app.models import Base
 
 
 class Store(Base):
     """店舗情報"""
+
     __tablename__ = "stores"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -22,6 +33,7 @@ class Store(Base):
 
 class SlotMachine(Base):
     """台データ"""
+
     __tablename__ = "slot_machines"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -43,6 +55,7 @@ class SlotMachine(Base):
 
 class Prediction(Base):
     """AI予測結果"""
+
     __tablename__ = "predictions"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -61,6 +74,7 @@ class Prediction(Base):
 
 class ScrapingLog(Base):
     """スクレイピング実行ログ"""
+
     __tablename__ = "scraping_logs"
 
     id = Column(Integer, primary_key=True, index=True)

@@ -49,3 +49,6 @@ torch==2.5.1
 scikit-learn==1.6.0
 celery==5.4.0
 redis==5.2.0
+undetected-chromedriver==3.5.5
+ruff==0.8.6
+pytest==8.0.0
