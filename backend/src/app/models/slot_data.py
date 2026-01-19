@@ -57,7 +57,9 @@ class SlotMachine(Base):
 
     # ユニーク制約: 同じ店舗・台番号・日付の組み合わせは一意
     __table_args__ = (
-        UniqueConstraint("store_id", "machine_number", "data_date", name="uq_machine_date"),
+        UniqueConstraint(
+            "store_id", "machine_number", "data_date", name="uq_machine_date"
+        ),
     )
 
     # リレーション
@@ -154,7 +156,9 @@ class DailyModelSummary(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     __table_args__ = (
-        UniqueConstraint("store_id", "model_id", "data_date", name="uq_store_model_date"),
+        UniqueConstraint(
+            "store_id", "model_id", "data_date", name="uq_store_model_date"
+        ),
     )
 
     # リレーション
