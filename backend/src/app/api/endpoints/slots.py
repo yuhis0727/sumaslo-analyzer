@@ -1,12 +1,14 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.app.models import get_db
 from src.app.models.slot_data import Prediction, ScrapingLog, SlotMachine, Store
 from src.app.services.ai_analyzer import SlotAIAnalyzer
+from src.app.services.analysis_service import AnalysisService
+from src.app.services.data_service import DataService
 from src.app.services.scraper import AnasloScraper
 
 router = APIRouter()
@@ -232,3 +234,140 @@ async def get_scraping_logs(
         .all()
     )
     return logs
+
+
+# ===================
+# 新しい分析エンドポイント
+# ===================
+
+
+@router.get("/recommendations/{store_id}")
+async def get_recommendations(
+    store_id: int,
+    history_days: int = Query(30, ge=7, le=90, description="分析に使う過去日数"),
+    top_n: int = Query(10, ge=1, le=50, description="推奨台数"),
+    db: Session = Depends(get_db),
+):
+    """座るべき台を推奨（新分析ロジック）"""
+    store = db.query(Store).filter(Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="店舗が見つかりません")
+
+    analysis_service = AnalysisService(db)
+    result = analysis_service.get_recommended_machines(
+        store_id=store_id,
+        history_days=history_days,
+        top_n=top_n,
+    )
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return result
+
+
+@router.get("/machines/{store_id}/{machine_number}")
+async def get_machine_detail(
+    store_id: int,
+    machine_number: int,
+    history_days: int = Query(30, ge=7, le=90),
+    db: Session = Depends(get_db),
+):
+    """特定の台番号の詳細分析"""
+    store = db.query(Store).filter(Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="店舗が見つかりません")
+
+    analysis_service = AnalysisService(db)
+    result = analysis_service.get_machine_detail(
+        store_id=store_id,
+        machine_number=machine_number,
+        history_days=history_days,
+    )
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return result
+
+
+@router.post("/scrape-by-date/{store_id}")
+async def scrape_store_data_by_date(
+    store_id: int,
+    target_date: str = Query(..., description="取得日付（例: 2026/01/14）"),
+    background_tasks: BackgroundTasks = None,
+    db: Session = Depends(get_db),
+):
+    """日付指定でデータをスクレイピング（Cloudflare対応）"""
+    store = db.query(Store).filter(Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="店舗が見つかりません")
+
+    if not store.anaslo_url:
+        raise HTTPException(status_code=400, detail="店舗のURLが設定されていません")
+
+    # バックグラウンドでスクレイピング実行
+    background_tasks.add_task(
+        execute_scraping_by_date, store_id, store.anaslo_url, target_date, db
+    )
+
+    return {
+        "message": "スクレイピングを開始しました",
+        "store_id": store_id,
+        "target_date": target_date,
+    }
+
+
+async def execute_scraping_by_date(
+    store_id: int, list_url: str, target_date: str, db: Session
+):
+    """日付指定スクレイピング実行（バックグラウンド処理）"""
+    data_service = DataService(db)
+    log = data_service.create_scraping_log(store_id=store_id, status="running")
+
+    try:
+        scraper = AnasloScraper(headless=False)
+        data = scraper.scrape_store_data_by_date(list_url, target_date)
+
+        # 日付をパース
+        data_date = datetime.strptime(target_date, "%Y/%m/%d").date()
+
+        # データを保存
+        saved_count = data_service.save_scraped_data(data, data_date)
+
+        # 集計を実行
+        data_service.run_all_aggregations(store_id, data_date)
+
+        data_service.update_scraping_log(
+            log, status="success", scraped_count=saved_count
+        )
+
+    except Exception as e:
+        data_service.update_scraping_log(
+            log, status="failed", error_message=str(e)
+        )
+
+
+@router.post("/aggregate/{store_id}")
+async def run_aggregation(
+    store_id: int,
+    data_date: date = Query(..., description="集計対象日"),
+    history_days: int = Query(30, ge=7, le=90),
+    db: Session = Depends(get_db),
+):
+    """手動で集計を実行"""
+    store = db.query(Store).filter(Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="店舗が見つかりません")
+
+    data_service = DataService(db)
+    result = data_service.run_all_aggregations(store_id, data_date, history_days)
+
+    return {
+        "message": "集計が完了しました",
+        "store_id": store_id,
+        "data_date": data_date.isoformat(),
+        "store_summary": result["store_summary"] is not None,
+        "model_summaries_count": len(result["model_summaries"]),
+        "position_histories_count": len(result["position_histories"]),
+    }
