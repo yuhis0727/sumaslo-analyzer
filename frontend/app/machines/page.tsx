@@ -7,9 +7,13 @@ import EventOrNSelector, { FilterMode, EventName } from "../components/EventOrNS
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
+type MachineType = "AT" | "A" | "BT";
+type TypeFilter = "all" | MachineType;
+
 type Machine = {
   machine_number: number;
   model_name: string;
+  machine_type: MachineType;
   win_rate: number;
   avg_diff: number;
   total_diff: number;
@@ -36,6 +40,7 @@ export default function MachinesPage() {
   const [n, setN] = useState(7);
   const [event, setEvent] = useState<EventName>("ニャンギラス");
   const [minDays, setMinDays] = useState(8);
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -64,9 +69,10 @@ export default function MachinesPage() {
 
   const filtered = machines.filter(
     (m) =>
-      search === "" ||
-      m.machine_number.toString().includes(search) ||
-      m.model_name.includes(search)
+      (typeFilter === "all" || m.machine_type === typeFilter) &&
+      (search === "" ||
+        m.machine_number.toString().includes(search) ||
+        m.model_name.includes(search))
   );
 
   const modeLabel = mode === "n" ? `${n}の日` : event;
@@ -80,6 +86,25 @@ export default function MachinesPage() {
           mode={mode} n={n} event={event}
           onModeChange={handleMode} onNChange={handleN} onEventChange={handleEvent}
         />
+
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          {(["all", "AT", "A", "BT"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
+                typeFilter === t
+                  ? t === "A" ? "bg-green-600 text-white"
+                  : t === "BT" ? "bg-purple-600 text-white"
+                  : t === "AT" ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t === "all" ? "全台" : t === "A" ? "Aタイプ" : t + "機"}
+            </button>
+          ))}
+        </div>
 
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">最低日数:</span>

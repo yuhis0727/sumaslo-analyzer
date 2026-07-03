@@ -7,8 +7,12 @@ import EventOrNSelector, { FilterMode, EventName } from "../components/EventOrNS
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
+type MachineType = "AT" | "A" | "BT";
+type TypeFilter = "all" | MachineType;
+
 type ModelStat = {
   model_name: string;
+  machine_type: MachineType;
   n_machines: number;
   win_rate: number;
   avg_diff: number;
@@ -39,6 +43,7 @@ export default function ModelsPage() {
   const [mode, setMode] = useState<FilterMode>("n");
   const [n, setN] = useState(7);
   const [event, setEvent] = useState<EventName>("ニャンギラス");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [models, setModels] = useState<ModelStat[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -58,6 +63,7 @@ export default function ModelsPage() {
   const handleEvent = (e: EventName) => { setEvent(e); fetch(mode, n, e); };
 
   const modeLabel = mode === "n" ? `${n}の日` : event;
+  const filtered = typeFilter === "all" ? models : models.filter(m => m.machine_type === typeFilter);
   const recentMonths = models.length > 0 ? Object.keys(models[0].monthly_avg ?? {}).sort().slice(-3) : [];
 
   return (
@@ -68,6 +74,25 @@ export default function ModelsPage() {
           mode={mode} n={n} event={event}
           onModeChange={handleMode} onNChange={handleN} onEventChange={handleEvent}
         />
+      </div>
+
+      <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 self-start">
+        {(["all", "AT", "A", "BT"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTypeFilter(t)}
+            className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
+              typeFilter === t
+                ? t === "A" ? "bg-green-600 text-white"
+                : t === "BT" ? "bg-purple-600 text-white"
+                : t === "AT" ? "bg-blue-600 text-white"
+                : "bg-white text-gray-700 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {t === "all" ? "全機種" : t === "A" ? "Aタイプ" : t + "機"}
+          </button>
+        ))}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -92,13 +117,20 @@ export default function ModelsPage() {
               {loading ? (
                 <tr><td colSpan={5 + recentMonths.length} className="text-center py-12 text-gray-400">読み込み中...</td></tr>
               ) : (
-                models.map((m, i) => (
+                filtered.map((m, i) => (
                   <tr key={m.model_name} className={`hover:bg-gray-50 ${m.win_rate >= 0.65 ? "bg-green-50/40" : ""}`}>
                     <td className="px-4 py-2.5 text-gray-400 text-xs">{i + 1}</td>
                     <td className="px-4 py-2.5">
-                      <Link href={`/models/${encodeURIComponent(m.model_name)}`} className="font-medium text-gray-800 hover:text-[#1A3A5C] hover:underline">
-                        {m.model_name}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded shrink-0 ${
+                          m.machine_type === "A" ? "bg-green-100 text-green-700" :
+                          m.machine_type === "BT" ? "bg-purple-100 text-purple-700" :
+                          "bg-blue-100 text-blue-700"
+                        }`}>{m.machine_type === "A" ? "A" : m.machine_type}</span>
+                        <Link href={`/models/${encodeURIComponent(m.model_name)}`} className="font-medium text-gray-800 hover:text-[#1A3A5C] hover:underline">
+                          {m.model_name}
+                        </Link>
+                      </div>
                     </td>
                     <td className="px-4 py-2.5 text-center text-gray-500">{m.n_machines}台</td>
                     <td className="px-4 py-2.5"><WinBar rate={m.win_rate} /></td>

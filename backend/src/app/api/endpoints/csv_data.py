@@ -57,6 +57,29 @@ def _today_events() -> list[str]:
     return [name for name, meta in EVENT_CALENDAR.items() if today_str in meta["dates"]]
 
 
+# ── 機種タイプ判定 ────────────────────────
+_BT_MACHINES: frozenset[str] = frozenset({
+    "A-SLOT+異世界かるてっとBT",
+    "L不二子BT",
+    "クレアの秘宝伝～はじまりの扉と太陽の石～ボーナストリガーver.",
+    "SHAKE BONUS TRIGGER",
+    "マジカルハロウィン ボーナストリガー",
+    "バーニングエクスプレス",
+})
+_A_KEYWORDS: tuple[str, ...] = (
+    "ジャグラー", "ハナハナ", "ハナビ", "サンダーV", "沖ドキ", "ディスクアップ", "リオエース", "バーサス",
+)
+
+
+def _model_type(name: str) -> str:
+    """機種タイプ判定: AT / A / BT (CSV に列がないため名前から推定)"""
+    if name in _BT_MACHINES:
+        return "BT"
+    if any(k in name for k in _A_KEYWORDS):
+        return "A"
+    return "AT"
+
+
 @lru_cache(maxsize=1)
 def _load_df() -> pd.DataFrame:
     if not Path(CSV_PATH).exists():
@@ -243,6 +266,7 @@ def get_machines(
         {
             "machine_number": int(r["machine_number"]),
             "model_name": r["model_name"],
+            "machine_type": _model_type(r["model_name"]),
             "win_rate": round(r["win_rate"], 4),
             "avg_diff": int(r["avg_diff"]),
             "total_diff": int(r["total_diff_sum"]),
@@ -327,6 +351,7 @@ def get_machine_history(
 
     return {
         "machine_number": machine_number,
+        "machine_type": _model_type(current_model),
         "model_name": current_model,
         "summary": {
             "n_days": len(sub),
@@ -378,6 +403,7 @@ def get_models(
     return [
         {
             "model_name": r["model_name"],
+            "machine_type": _model_type(r["model_name"]),
             "n_machines": int(r["n_machines"]),
             "win_rate": round(r["win_rate"], 4),
             "avg_diff": int(r["avg_diff"]),
@@ -439,6 +465,7 @@ def get_model_detail(model_name: str):
 
     return {
         "model_name": model_name,
+        "machine_type": _model_type(model_name),
         "machine_count": len(current_machines),
         "overall": {
             "win_rate": round(float((base["total_diff"] > 0).mean()), 4),

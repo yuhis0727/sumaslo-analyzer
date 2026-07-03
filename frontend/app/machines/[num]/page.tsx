@@ -4,21 +4,23 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import axios from "axios";
 import Link from "next/link";
+import { ResponsiveLine } from "@nivo/line";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 type Monthly = { month: string; avg_diff: number; win_rate: number; n: number };
 type EventStat = { n_days: number; win_rate: number; avg_diff: number };
-type Record = { date: string; model_name: string; total_diff: number | null; game_count: number | null; day_of_week: string; day: number };
+type DayRecord = { date: string; model_name: string; total_diff: number | null; game_count: number | null; day_of_week: string; day: number };
 
 type Detail = {
   machine_number: number;
+  machine_type: string;
   model_name: string;
   summary: { n_days: number; win_rate: number; avg_diff: number; total_diff: number };
   monthly: Monthly[];
   event_stats: Record<string, EventStat>;
   n_day_stats: Record<string, EventStat>;
-  records: Record[];
+  records: DayRecord[];
 };
 
 function diffColor(v: number) { return v >= 0 ? "text-green-600" : "text-red-500"; }
@@ -45,13 +47,29 @@ export default function MachineDetailPage() {
 
   const maxAbsDiff = Math.max(...data.monthly.map(m => Math.abs(m.avg_diff)), 1);
 
+  const trendData = [{
+    id: "diff",
+    data: data.records
+      .filter(r => r.total_diff != null)
+      .map(r => ({ x: r.date, y: r.total_diff as number })),
+  }];
+  const typeBadgeClass = data.machine_type === "A"
+    ? "bg-green-100 text-green-700"
+    : data.machine_type === "BT"
+    ? "bg-purple-100 text-purple-700"
+    : "bg-blue-100 text-blue-700";
+  const typeLabel = data.machine_type === "A" ? "Aタイプ" : data.machine_type + "機";
+
   return (
     <div className="space-y-6">
       {/* ヘッダー */}
       <div className="flex items-start gap-4">
         <Link href="/machines" className="text-gray-400 hover:text-gray-600 mt-1">← 台番一覧</Link>
         <div>
-          <div className="text-3xl font-bold text-[#1A3A5C]">{data.machine_number}番</div>
+          <div className="flex items-center gap-3">
+            <div className="text-3xl font-bold text-[#1A3A5C]">{data.machine_number}番</div>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded ${typeBadgeClass}`}>{typeLabel}</span>
+          </div>
           <Link href={`/models/${encodeURIComponent(data.model_name)}`} className="text-gray-600 hover:underline text-lg">
             {data.model_name}
           </Link>
@@ -145,6 +163,46 @@ export default function MachineDetailPage() {
         </div>
       </div>
 
+      {/* 差枚推移グラフ */}
+      {trendData[0].data.length > 1 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="font-semibold text-gray-700 mb-3">差枚推移（全期間）</h2>
+          <div className="h-52">
+            <ResponsiveLine
+              data={trendData}
+              margin={{ top: 8, right: 16, bottom: 48, left: 68 }}
+              xScale={{ type: "time", format: "%Y-%m-%d", useUTC: false, precision: "day" }}
+              xFormat="time:%m/%d"
+              yScale={{ type: "linear", stacked: false, min: "auto", max: "auto" }}
+              axisBottom={{
+                format: "%m/%d",
+                tickValues: "every 2 weeks",
+                tickRotation: -35,
+                tickSize: 4,
+              }}
+              axisLeft={{ tickSize: 3, tickValues: 5, legend: "差枚", legendOffset: -55, legendPosition: "middle" }}
+              colors={["#3b82f6"]}
+              lineWidth={1.5}
+              pointSize={3}
+              pointColor="#3b82f6"
+              enableArea
+              areaOpacity={0.08}
+              enableCrosshair
+              markers={[{ axis: "y", value: 0, lineStyle: { stroke: "#9ca3af", strokeWidth: 1, strokeDasharray: "4 4" } }]}
+              tooltip={({ point }) => (
+                <div className="bg-white border border-gray-200 rounded shadow-sm px-2 py-1 text-xs">
+                  <span className="text-gray-500">{point.data.xFormatted}</span>
+                  <span className={`ml-2 font-bold ${Number(point.data.y) >= 0 ? "text-green-600" : "text-red-500"}`}>
+                    {Number(point.data.y) >= 0 ? "+" : ""}{Number(point.data.y).toLocaleString()}
+                  </span>
+                </div>
+              )}
+              theme={{ axis: { ticks: { text: { fontSize: 10, fill: "#9ca3af" } } } }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* 日別履歴 */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="p-4 border-b border-gray-100 font-semibold text-gray-700">日別履歴（{data.records.length}日）</div>
@@ -160,7 +218,7 @@ export default function MachineDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {[...data.records].reverse().map((r, i) => (
+              {[...data.records].reverse().map((r: DayRecord, i) => (
                 <tr key={i} className={`border-t border-gray-50 hover:bg-gray-50 ${(r.total_diff ?? 0) >= 0 ? "bg-green-50/20" : ""}`}>
                   <td className="px-4 py-2 font-mono text-gray-600">{r.date}</td>
                   <td className="px-4 py-2 text-gray-400">{r.day_of_week}</td>

@@ -12,6 +12,7 @@ type MachineStat = { machine_number: number; n_days: number; win_rate: number; a
 
 type Detail = {
   model_name: string;
+  machine_type: string;
   machine_count: number;
   overall: { win_rate: number; avg_diff: number; total_diff: number };
   monthly: Monthly[];
@@ -49,7 +50,14 @@ export default function ModelDetailPage() {
       <div className="flex items-start gap-4">
         <Link href="/models" className="text-gray-400 hover:text-gray-600 mt-1">← 機種一覧</Link>
         <div>
-          <div className="text-2xl font-bold text-gray-900">{data.model_name}</div>
+          <div className="flex items-center gap-3">
+            <div className="text-2xl font-bold text-gray-900">{data.model_name}</div>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+              data.machine_type === "A" ? "bg-green-100 text-green-700" :
+              data.machine_type === "BT" ? "bg-purple-100 text-purple-700" :
+              "bg-blue-100 text-blue-700"
+            }`}>{data.machine_type === "A" ? "Aタイプ" : data.machine_type + "機"}</span>
+          </div>
           <div className="text-sm text-gray-500 mt-0.5">{data.machine_count}台設置</div>
         </div>
       </div>
