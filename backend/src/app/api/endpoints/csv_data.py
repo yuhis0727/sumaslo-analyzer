@@ -21,6 +21,41 @@ CSV_PATH = os.environ.get(
 
 DOW_JP = ["月", "火", "水", "木", "金", "土", "日"]
 
+# ── イベントカレンダー ────────────────────────
+EVENT_CALENDAR: dict[str, dict] = {
+    "ニャンギラス": {
+        "dates": [
+            "2026-01-01", "2026-01-11", "2026-01-21", "2026-01-31",
+            "2026-02-01", "2026-02-11", "2026-02-21",
+            "2026-03-01", "2026-03-11", "2026-03-21", "2026-03-31",
+            "2026-04-01", "2026-04-11", "2026-04-21",
+            "2026-05-01", "2026-05-11", "2026-05-21",
+            "2026-06-01", "2026-06-11", "2026-06-21",
+            "2026-07-01",
+        ],
+        "note": "1・11・21・31のつく日。毎月開催のレギュラーイベント。",
+    },
+    "大田区活性化": {
+        "dates": [
+            "2026-01-30", "2026-02-28", "2026-03-30", "2026-04-30", "2026-05-30",
+            "2026-06-13", "2026-06-30",
+        ],
+        "note": "月末30日開催。5月で一度終了し6/13に類似イベント再開、6/30から元の形式に戻る。",
+    },
+    "ファン感謝デー": {
+        "dates": [
+            "2026-02-13", "2026-02-14", "2026-02-15",
+            "2026-05-22", "2026-05-23", "2026-05-24",
+        ],
+        "note": "年2回の複数日開催。5/22はマルハン創業日。",
+    },
+}
+
+def _today_events() -> list[str]:
+    """今日開催のイベント名一覧"""
+    today_str = date.today().isoformat()
+    return [name for name, meta in EVENT_CALENDAR.items() if today_str in meta["dates"]]
+
 
 @lru_cache(maxsize=1)
 def _load_df() -> pd.DataFrame:
@@ -317,12 +352,14 @@ def get_ai_context(question: str = Query(...)):
     event_n = _today_event_n()
     latest_date = df["date"].max()
 
+    today_events = _today_events()
     context = {
         "today": today.isoformat(),
         "day_of_week": DOW_JP[today.weekday()],
         "event_n": event_n,
         "latest_data_date": latest_date.strftime("%Y-%m-%d"),
         "question": question,
+        "today_special_events": today_events,
     }
 
     if event_n > 0:
@@ -351,6 +388,133 @@ def get_ai_context(question: str = Query(...)):
         ]
 
     return context
+
+
+# ── /api/data/events ────────────────────────
+@router.get("/data/events")
+def get_events():
+    """イベントカレンダー一覧とCSV内に存在する日付を返す"""
+    df = _get_df()
+    csv_dates = set(df["date"].dt.strftime("%Y-%m-%d").unique())
+    result = []
+    for name, meta in EVENT_CALENDAR.items():
+        dates_in_csv = [d for d in meta["dates"] if d in csv_dates]
+        result.append({
+            "event_name": name,
+            "note": meta["note"],
+            "total_dates": len(meta["dates"]),
+            "dates_in_data": len(dates_in_csv),
+            "dates": meta["dates"],
+        })
+    return result
+
+
+# ── /api/data/event-analysis ────────────────────────
+@router.get("/data/event-analysis")
+def get_event_analysis(event: str = Query(...)):
+    """
+    イベント別データ分析。
+    各イベント日の店舗全体実績・機種別・台番別ランキングを返す。
+    """
+    if event not in EVENT_CALENDAR:
+        raise HTTPException(status_code=404, detail=f"イベント '{event}' は登録されていません")
+
+    df = _get_df()
+    latest_date = df["date"].max()
+    current_machines = set(df[df["date"] == latest_date]["machine_number"])
+    model_map = _current_model_map(df)
+
+    event_dates_all = [pd.Timestamp(d) for d in EVENT_CALENDAR[event]["dates"]]
+    event_df = df[df["date"].isin(event_dates_all)]
+
+    if event_df.empty:
+        return {"event_name": event, "dates_summary": [], "top_models": [], "top_machines": []}
+
+    # 日別サマリー
+    by_date = (
+        event_df.groupby("date")
+        .agg(
+            total_machines=("machine_number", "count"),
+            plus_machines=("total_diff", lambda x: (x > 0).sum()),
+            avg_diff=("total_diff", "mean"),
+        )
+        .reset_index()
+        .sort_values("date")
+    )
+    dates_summary = [
+        {
+            "date": r["date"].strftime("%Y-%m-%d"),
+            "day_of_week": DOW_JP[r["date"].weekday()],
+            "total_machines": int(r["total_machines"]),
+            "plus_machines": int(r["plus_machines"]),
+            "positive_rate": round(r["plus_machines"] / r["total_machines"], 4),
+            "avg_diff": int(r["avg_diff"]),
+        }
+        for _, r in by_date.iterrows()
+    ]
+
+    # 現在稼働台限定で機種別集計
+    cur_event_df = event_df[event_df["machine_number"].isin(current_machines)].copy()
+    cur_event_df["current_model"] = cur_event_df["machine_number"].map(model_map)
+
+    top_models = (
+        cur_event_df.groupby("current_model")
+        .agg(
+            n_days=("total_diff", "count"),
+            win_rate=("total_diff", lambda x: (x > 0).mean()),
+            avg_diff=("total_diff", "mean"),
+        )
+        .query("n_days >= 2")
+        .sort_values(["win_rate", "avg_diff"], ascending=False)
+        .head(20)
+        .reset_index()
+    )
+    top_models_list = [
+        {
+            "model_name": r["current_model"],
+            "n_days": int(r["n_days"]),
+            "win_rate": round(r["win_rate"], 4),
+            "avg_diff": int(r["avg_diff"]),
+        }
+        for _, r in top_models.iterrows()
+    ]
+
+    # 台番別集計
+    top_machines = (
+        cur_event_df.groupby("machine_number")
+        .agg(
+            n_days=("total_diff", "count"),
+            win_rate=("total_diff", lambda x: (x > 0).mean()),
+            avg_diff=("total_diff", "mean"),
+        )
+        .query("n_days >= 2")
+        .sort_values(["win_rate", "avg_diff"], ascending=False)
+        .head(30)
+        .reset_index()
+    )
+    top_machines["model_name"] = top_machines["machine_number"].map(model_map)
+    top_machines_list = [
+        {
+            "machine_number": int(r["machine_number"]),
+            "model_name": r["model_name"],
+            "n_days": int(r["n_days"]),
+            "win_rate": round(r["win_rate"], 4),
+            "avg_diff": int(r["avg_diff"]),
+        }
+        for _, r in top_machines.iterrows()
+    ]
+
+    # 全体平均（比較用）
+    overall_avg = int(df[df["machine_number"].isin(current_machines)]["total_diff"].mean())
+
+    return {
+        "event_name": event,
+        "note": EVENT_CALENDAR[event]["note"],
+        "dates_summary": dates_summary,
+        "top_models": top_models_list,
+        "top_machines": top_machines_list,
+        "overall_avg_diff": overall_avg,
+    }
 
 
 # ── /api/data/zentai-history ────────────────────────
