@@ -5,10 +5,12 @@ import { usePathname } from 'next/navigation';
 import './globals.css';
 
 const NAV = [
-  { href: '/',          label: 'ダッシュボード' },
-  { href: '/machines',  label: '台番分析' },
-  { href: '/models',    label: '機種別' },
-  { href: '/ai',        label: 'AI社員' },
+  { href: '/',                      label: 'ダッシュボード' },
+  { href: '/machines',              label: '台番分析' },
+  { href: '/models',                label: '機種別' },
+  { href: '/analytics/layout-changes',  label: '配置変更' },
+  { href: '/analytics/fixed-setting',   label: '固定設定6' },
+  { href: '/ai',                    label: 'AI社員' },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {
