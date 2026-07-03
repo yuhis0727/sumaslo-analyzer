@@ -8,6 +8,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Date,
 )
 from sqlalchemy.orm import relationship
 
@@ -21,55 +22,69 @@ class Store(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
-    area = Column(String(255), nullable=True)
-    anaslo_url = Column(String(512), nullable=True)
+    address = Column(String(512), nullable=True)
+    prefecture = Column(String(50), nullable=True)
+    url = Column(String(512), nullable=True)  # アナスロURL
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
-    # リレーション
-    machines = relationship("SlotMachine", back_populates="store")
+    machines = relationship("Machine", back_populates="store")
     predictions = relationship("Prediction", back_populates="store")
+    scraping_logs = relationship("ScrapingLog", back_populates="store")
 
 
-class SlotMachine(Base):
-    """台データ"""
+class Machine(Base):
+    """台データ (machines テーブル)"""
 
-    __tablename__ = "slot_machines"
+    __tablename__ = "machines"
 
     id = Column(Integer, primary_key=True, index=True)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
-    machine_number = Column(Integer, nullable=False)  # 台番号
-    model_name = Column(String(255), nullable=False)  # 機種名
-    game_count = Column(Integer, nullable=True)  # ゲーム数
-    big_bonus = Column(Integer, nullable=True)  # BB回数
-    regular_bonus = Column(Integer, nullable=True)  # RB回数
-    art_count = Column(Integer, nullable=True)  # ART回数
-    total_difference = Column(Integer, nullable=True)  # 差枚数
-    data_date = Column(DateTime, nullable=False)  # データ取得日
+    machine_number = Column(Integer, nullable=False)   # 台番号
+    model_name = Column(String(255), nullable=False)   # 機種名
+    date = Column(Date, nullable=False)                # データ取得日付
+    games_played = Column(Integer, nullable=True)      # ゲーム数
+    diff_medals = Column(Integer, nullable=True)       # 差枚数
+    bonus_count = Column(Integer, nullable=True)       # 総ボーナス回数
+    reg_count = Column(Integer, nullable=True)         # REG回数
+    big_count = Column(Integer, nullable=True)         # BIG回数
+    at_count = Column(Integer, nullable=True)          # ART/AT回数
     created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
-    # リレーション
     store = relationship("Store", back_populates="machines")
 
 
 class Prediction(Base):
-    """AI予測結果"""
+    """予測結果 (predictions テーブル)"""
 
     __tablename__ = "predictions"
 
     id = Column(Integer, primary_key=True, index=True)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
-    prediction_date = Column(DateTime, nullable=False)  # 予測日
-    high_setting_probability = Column(Float, nullable=False)  # 高設定台の確率
-    confidence_score = Column(Float, nullable=False)  # 信頼度スコア
-    recommended_machines = Column(Text, nullable=True)  # おすすめ台番号(JSON形式)
-    analysis_details = Column(Text, nullable=True)  # 分析詳細(JSON形式)
+    machine_number = Column(Integer, nullable=False)
+    model_name = Column(String(255), nullable=False)
+    date = Column(Date, nullable=False)
+    prediction_score = Column(Float, nullable=False)   # 高設定スコア (0〜1)
+    predicted_setting = Column(Integer, nullable=True) # 予測設定 (1〜6)
+    confidence = Column(Float, nullable=False)         # 信頼度スコア (0〜1)
     created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
-    # リレーション
     store = relationship("Store", back_populates="predictions")
+
+
+class TheoreticalValue(Base):
+    """機種別理論値 (theoretical_values テーブル)"""
+
+    __tablename__ = "theoretical_values"
+
+    id = Column(Integer, primary_key=True, index=True)
+    model_name = Column(String(255), nullable=False)   # 機種名
+    setting = Column(Integer, nullable=False)          # 設定 (1〜6)
+    reg_prob = Column(Float, nullable=True)            # REG確率 (1/N)
+    big_prob = Column(Float, nullable=True)            # BIG確率 (1/N)
+    at_rate = Column(Float, nullable=True)             # AT突入率
+    diff_rate_per_game = Column(Float, nullable=True)  # 差枚率 (枚/G)
+    source_url = Column(String(512), nullable=True)    # 情報ソースURL
 
 
 class ScrapingLog(Base):
@@ -79,9 +94,11 @@ class ScrapingLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
-    status = Column(String(50), nullable=False)  # success, failed, running
+    status = Column(String(50), nullable=False)        # success / failed / running
     error_message = Column(Text, nullable=True)
     scraped_count = Column(Integer, default=0)
     started_at = Column(DateTime, nullable=False)
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
+
+    store = relationship("Store", back_populates="scraping_logs")

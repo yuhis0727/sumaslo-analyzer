@@ -12,9 +12,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 class AnasloScraper:
     """アナスロからデータをスクレイピングするクラス（Cloudflare対応）"""
 
-    def __init__(self, headless: bool = False):
+    def __init__(self, headless: bool = False, chrome_version: int = None):
         # undetected-chromedriverはheadlessだと検出されやすいのでデフォルトFalse
         self.headless = headless
+        self.chrome_version = chrome_version
         self.driver = None
 
     def _setup_driver(self):
@@ -27,7 +28,10 @@ class AnasloScraper:
         options.add_argument("--disable-gpu")
         options.add_argument("--window-size=1920,1080")
 
-        self.driver = uc.Chrome(options=options, use_subprocess=True)
+        kwargs = {"options": options, "use_subprocess": True}
+        if self.chrome_version:
+            kwargs["version_main"] = self.chrome_version
+        self.driver = uc.Chrome(**kwargs)
 
     def _close_driver(self):
         """WebDriverのクローズ"""

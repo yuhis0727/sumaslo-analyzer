@@ -1,8 +1,21 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.app.api.endpoints.health_check import health_check
 from src.app.api.endpoints.slots import router as slots_router
+from src.app.api.endpoints.csv_data import router as csv_router
+from src.app.services.scheduler import start_scheduler, stop_scheduler
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """アプリ起動・終了時の処理"""
+    start_scheduler()
+    yield
+    stop_scheduler()
+
 
 app = FastAPI(
     title="Sumaslo Analyzer",
@@ -10,6 +23,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORSミドルウェアの追加
@@ -20,28 +34,15 @@ app.add_middleware(
         "https://sumaslo-analyzer.dev",
         "http://localhost",
         "https://localhost",
+        "http://localhost:3000",
+        "http://localhost:8080",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-# カスタムエラーハンドラーの設定
-
-# 必要なら使う
-# @app.exception_handler(RequestValidationError)
-# async def validation_exception_handler(request: Request,
-#                                        exc: RequestValidationError):
-#     errors = [err['msg'].replace("Value error, ", "")
-#               for err in exc.errors()]
-
-#     return JSONResponse(
-#         status_code=HTTP_422_UNPROCESSABLE_ENTITY,
-#         content={"error_messages": errors},
-#     )
-
-
-# エンドポイントのルーティングを追加
+# エンドポイントのルーティング
 app.include_router(health_check, prefix="/_health")
-app.include_router(slots_router, prefix="/api/v1/slots", tags=["slots"])
+app.include_router(slots_router, prefix="/api", tags=["slots"])
+app.include_router(csv_router, prefix="/api", tags=["csv-data"])

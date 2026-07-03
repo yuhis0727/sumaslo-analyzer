@@ -11,7 +11,7 @@ load_dotenv()
 # DATABASE_URLを環境変数から取得、デフォルト値を設定
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "mysql+pymysql://db-user:db-pass@db:3306/f2t?charset=utf8mb4",
+    "postgresql://db-user:db-pass@db:5432/sumaslo",
 )
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)

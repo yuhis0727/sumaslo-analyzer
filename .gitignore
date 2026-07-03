@@ -161,3 +161,16 @@ backend/cache/
 # Database
 *.sqlite3
 *.db
+
+# Data files (large / sensitive)
+*.csv
+*.pdf
+*.xlsx
+*.xls
+bulk_output.*
+
+# SSH / SSL keys
+docs/ssl/
+*.key
+*.pub
+docker/nginx/ssl/
