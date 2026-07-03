@@ -20,6 +20,7 @@ type Detail = {
   monthly: Monthly[];
   event_stats: Record<string, EventStat>;
   n_day_stats: Record<string, EventStat>;
+  plain_stats: EventStat | null;
   records: DayRecord[];
 };
 
@@ -121,12 +122,12 @@ export default function MachineDetailPage() {
 
         {/* イベント別・N日別集計 */}
         <div className="space-y-4">
-          {Object.keys(data.event_stats).length > 0 && (
+          {(Object.keys(data.event_stats).length > 0 || data.plain_stats) && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <h2 className="font-semibold text-gray-700 mb-3">イベント別</h2>
               <table className="w-full text-sm">
                 <thead className="text-xs text-gray-500">
-                  <tr><th className="text-left pb-2">イベント</th><th className="text-right pb-2">回数</th><th className="text-right pb-2">勝率</th><th className="text-right pb-2">平均差枚</th></tr>
+                  <tr><th className="text-left pb-2">日種別</th><th className="text-right pb-2">回数</th><th className="text-right pb-2">勝率</th><th className="text-right pb-2">平均差枚</th></tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {Object.entries(data.event_stats).map(([name, s]) => (
@@ -137,6 +138,14 @@ export default function MachineDetailPage() {
                       <td className={`py-1.5 text-right font-mono font-medium ${diffColor(s.avg_diff)}`}>{diffStr(s.avg_diff)}</td>
                     </tr>
                   ))}
+                  {data.plain_stats && (
+                    <tr className="bg-gray-50/60">
+                      <td className="py-1.5 text-gray-500 text-xs">平常日（Nの日・イベント以外）</td>
+                      <td className="py-1.5 text-right text-gray-400">{data.plain_stats.n_days}回</td>
+                      <td className="py-1.5 text-right">{winBadge(data.plain_stats.win_rate)}</td>
+                      <td className={`py-1.5 text-right font-mono font-medium ${diffColor(data.plain_stats.avg_diff)}`}>{diffStr(data.plain_stats.avg_diff)}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

@@ -124,12 +124,25 @@ def _today_event_n() -> int:
     return 0  # 10, 20, 30日 = 対象外
 
 
+# Nの日に該当する日付の日 (N=1-9 → day 1-9, 11-19, 21-29)
+_N_DAY_SET: frozenset[int] = frozenset(range(1, 10)) | frozenset(range(11, 20)) | frozenset(range(21, 30))
+
+
+def _all_event_timestamps() -> set:
+    ts: set = set()
+    for meta in EVENT_CALENDAR.values():
+        ts.update(pd.Timestamp(d) for d in meta["dates"])
+    return ts
+
+
 def _filter_by_event_or_n(
     df: pd.DataFrame,
     n: int | None,
     event: str | None,
+    plain: bool = False,
 ) -> pd.DataFrame:
-    """event が指定されていればそのイベント日、n が指定されていれば Nの日でフィルタ。"""
+    """event/n/plain のいずれかでフィルタ。
+    plain=True: Nの日でもイベント日でもない平常日のみ残す。"""
     if event is not None:
         if event not in EVENT_CALENDAR:
             raise HTTPException(status_code=400, detail=f"イベント '{event}' は登録されていません")
@@ -137,6 +150,12 @@ def _filter_by_event_or_n(
         return df[df["date"].isin(event_dates)]
     if n is not None:
         return df[df["date"].dt.day.isin(_event_days(n))]
+    if plain:
+        all_ev = _all_event_timestamps()
+        return df[
+            ~df["date"].isin(all_ev) &
+            ~df["date"].dt.day.isin(_N_DAY_SET)
+        ]
     return df
 
 
@@ -235,14 +254,15 @@ def get_summary(n: int | None = Query(None, ge=1, le=9)):
 def get_machines(
     n: int | None = Query(None, ge=1, le=9),
     event: str | None = Query(None),
+    plain: bool = Query(False),
     min_days: int = Query(5, ge=1),
     limit: int = Query(100, le=500),
 ):
-    """Nの日またはイベント日の台番別勝率一覧。n か event のどちらかを指定。"""
-    if n is None and event is None:
-        raise HTTPException(status_code=400, detail="n か event のどちらかを指定してください")
+    """Nの日/イベント日/平常日の台番別勝率一覧。n・event・plain のいずれかを指定。"""
+    if n is None and event is None and not plain:
+        raise HTTPException(status_code=400, detail="n・event・plain のいずれかを指定してください")
     df = _get_df()
-    df_n = _filter_by_event_or_n(df, n, event)
+    df_n = _filter_by_event_or_n(df, n, event, plain)
     latest_date = df["date"].max()
     current_machines = set(df[df["date"] == latest_date]["machine_number"])
     model_map = _current_model_map(df)
@@ -349,6 +369,18 @@ def get_machine_history(
                 "avg_diff": int(nv_sub["total_diff"].mean()),
             }
 
+    # 平常日集計（Nの日でもイベント日でもない日）
+    plain_sub = _filter_by_event_or_n(all_records, None, None, plain=True)
+    plain_stats = (
+        {
+            "n_days": len(plain_sub),
+            "win_rate": round(float((plain_sub["total_diff"] > 0).mean()), 4),
+            "avg_diff": int(plain_sub["total_diff"].mean()),
+        }
+        if not plain_sub.empty
+        else None
+    )
+
     return {
         "machine_number": machine_number,
         "machine_type": _model_type(current_model),
@@ -362,6 +394,7 @@ def get_machine_history(
         "monthly": monthly_list,
         "event_stats": event_stats,
         "n_day_stats": n_day_stats,
+        "plain_stats": plain_stats,
         "records": records,
     }
 
@@ -371,12 +404,13 @@ def get_machine_history(
 def get_models(
     n: int | None = Query(None, ge=1, le=9),
     event: str | None = Query(None),
+    plain: bool = Query(False),
 ):
-    """Nの日またはイベント日の機種別勝率。n か event のどちらかを指定。"""
-    if n is None and event is None:
-        raise HTTPException(status_code=400, detail="n か event のどちらかを指定してください")
+    """Nの日/イベント日/平常日の機種別勝率。n・event・plain のいずれかを指定。"""
+    if n is None and event is None and not plain:
+        raise HTTPException(status_code=400, detail="n・event・plain のいずれかを指定してください")
     df = _get_df()
-    df_n = _filter_by_event_or_n(df, n, event)
+    df_n = _filter_by_event_or_n(df, n, event, plain)
 
     stats = (
         df_n.groupby("model_name")

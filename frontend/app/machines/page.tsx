@@ -48,7 +48,8 @@ export default function MachinesPage() {
   const buildParams = (m: FilterMode, nVal: number, ev: EventName, min: number) => {
     const p = new URLSearchParams({ min_days: String(min), limit: "300" });
     if (m === "n") p.set("n", String(nVal));
-    else p.set("event", ev);
+    else if (m === "event") p.set("event", ev);
+    else p.set("plain", "true");
     return p.toString();
   };
 

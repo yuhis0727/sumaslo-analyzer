@@ -49,7 +49,7 @@ export default function ModelsPage() {
 
   const fetch = (m: FilterMode, nVal: number, ev: EventName) => {
     setLoading(true);
-    const p = m === "n" ? `n=${nVal}` : `event=${encodeURIComponent(ev)}`;
+    const p = m === "n" ? `n=${nVal}` : m === "event" ? `event=${encodeURIComponent(ev)}` : `plain=true`;
     axios
       .get<ModelStat[]>(`${API}/api/data/models?${p}`)
       .then((r) => setModels(r.data))

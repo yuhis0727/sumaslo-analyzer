@@ -1,6 +1,6 @@
 "use client";
 
-export type FilterMode = "n" | "event";
+export type FilterMode = "n" | "event" | "plain";
 export const EVENT_NAMES = ["ニャンギラス", "大田区活性化", "ファン感謝デー"] as const;
 export type EventName = typeof EVENT_NAMES[number];
 
@@ -18,17 +18,19 @@ export default function EventOrNSelector({ mode, n, event, onModeChange, onNChan
     <div className="flex flex-wrap items-center gap-3">
       {/* モード切替 */}
       <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-medium">
-        {(["n", "event"] as FilterMode[]).map((m) => (
+        {(["n", "event", "plain"] as FilterMode[]).map((m) => (
           <button
             key={m}
             onClick={() => onModeChange(m)}
             className={`px-3 py-1.5 transition-colors ${
               mode === m
-                ? "bg-[#1A3A5C] text-white"
+                ? m === "plain"
+                  ? "bg-gray-600 text-white"
+                  : "bg-[#1A3A5C] text-white"
                 : "bg-white text-gray-600 hover:bg-gray-50"
             }`}
           >
-            {m === "n" ? "Nの日" : "イベント"}
+            {m === "n" ? "Nの日" : m === "event" ? "イベント" : "平常日"}
           </button>
         ))}
       </div>
@@ -69,6 +71,11 @@ export default function EventOrNSelector({ mode, n, event, onModeChange, onNChan
             </button>
           ))}
         </div>
+      )}
+
+      {/* 平常日: 説明テキスト */}
+      {mode === "plain" && (
+        <span className="text-xs text-gray-400">Nの日・イベント日を除いた日（10日・20日・非イベント30/31日）</span>
       )}
     </div>
   );
