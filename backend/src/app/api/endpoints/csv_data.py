@@ -302,13 +302,14 @@ def get_machine_history(
     machine_number: int,
     n: int | None = Query(None, ge=1, le=9),
     event: str | None = Query(None),
+    plain: bool = Query(False),
 ):
-    """特定台番の履歴。n か event で絞り込み可。"""
+    """特定台番の履歴。n / event / plain で絞り込み可（省略時は全期間）。"""
     df = _get_df()
     sub = df[df["machine_number"] == machine_number].sort_values("date")
     if sub.empty:
         raise HTTPException(status_code=404, detail="台番が見つかりません")
-    sub = _filter_by_event_or_n(sub, n, event)
+    sub = _filter_by_event_or_n(sub, n, event, plain)
 
     records = []
     for _, r in sub.iterrows():
