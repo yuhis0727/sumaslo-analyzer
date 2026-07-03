@@ -402,68 +402,80 @@ def get_fixed_setting(
 ):
     """
     固定設定6台の検出。
-    「機種の平均差枚を diff_over_model 以上上回り、
-     かつ直近 consecutive 回以上連続プラスの台」を返す。
-    n指定でNの日限定、未指定で全日。
+    全台系日のノイズを除くため「日ごとの偏差」を使う。
+      per_day_deviation = machine_diff - model_daily_avg (同じ日の機種平均)
+      win_rate_vs_model = その台が機種平均を上回った日の割合
+    全台系日は機種全体が底上げされるため偏差≈0となり自動的に除外される。
     """
     df = _get_df()
     latest_date = df["date"].max()
     current_machines = set(df[df["date"] == latest_date]["machine_number"])
     model_map = _current_model_map(df)
 
-    base = df[df["machine_number"].isin(current_machines)]
+    base = df[df["machine_number"].isin(current_machines)].copy()
+    base["current_model"] = base["machine_number"].map(model_map)
     if n is not None:
         base = base[base["date"].dt.day.isin(_event_days(n))]
 
-    # 機種平均差枚
-    model_avg = (
-        base.groupby("model_name")["total_diff"]
+    # 同じ日・同じ機種（現在機種）の平均差枚
+    model_daily_avg = (
+        base.groupby(["date", "current_model"])["total_diff"]
         .mean()
-        .rename("model_avg_diff")
+        .rename("model_daily_avg")
+        .reset_index()
     )
+    base = base.merge(model_daily_avg, on=["date", "current_model"], how="left")
+
+    # 日ごとの偏差: その台が当日の機種平均をどれだけ上回ったか
+    base["day_deviation"] = base["total_diff"] - base["model_daily_avg"]
+    # 機種平均を上回ったか（全台系日ではほぼ全台≈0なのでフラット）
+    base["beat_model"] = base["day_deviation"] > 0
 
     # 台番別集計
     machine_stats = (
         base.groupby("machine_number")
         .agg(
             n_days=("total_diff", "count"),
-            win_rate=("total_diff", lambda x: (x > 0).mean()),
             avg_diff=("total_diff", "mean"),
+            avg_day_deviation=("day_deviation", "mean"),
+            win_rate_vs_model=("beat_model", "mean"),  # 機種平均超えた日の割合
         )
         .query(f"n_days >= {min_days}")
         .reset_index()
     )
     machine_stats["model_name"] = machine_stats["machine_number"].map(model_map)
-    machine_stats = machine_stats.join(model_avg, on="model_name")
-    machine_stats["diff_over_model"] = (
-        machine_stats["avg_diff"] - machine_stats["model_avg_diff"]
-    )
 
-    # 連続プラスチェック（最新 consecutive 回）
-    def count_recent_consecutive_plus(machine_num: int) -> int:
+    # 機種全体の平均差枚（参考表示用）
+    model_overall_avg = (
+        base.groupby("current_model")["total_diff"].mean().rename("model_avg_diff")
+    )
+    machine_stats = machine_stats.join(model_overall_avg, on="model_name")
+
+    # 連続偏差プラスチェック（直近N回、機種平均超えベース）
+    def count_consecutive_beat(machine_num: int) -> int:
         sub = (
             base[base["machine_number"] == machine_num]
-            .sort_values("date", ascending=False)["total_diff"]
+            .sort_values("date", ascending=False)["beat_model"]
             .tolist()
         )
         count = 0
         for v in sub:
-            if v > 0:
+            if v:
                 count += 1
             else:
                 break
         return count
 
-    machine_stats["consecutive_plus"] = machine_stats["machine_number"].apply(
-        count_recent_consecutive_plus
+    machine_stats["consecutive_beat"] = machine_stats["machine_number"].apply(
+        count_consecutive_beat
     )
 
     result = (
         machine_stats[
-            (machine_stats["diff_over_model"] >= diff_over_model)
-            & (machine_stats["consecutive_plus"] >= consecutive)
+            (machine_stats["avg_day_deviation"] >= diff_over_model)
+            & (machine_stats["consecutive_beat"] >= consecutive)
         ]
-        .sort_values(["diff_over_model", "win_rate"], ascending=False)
+        .sort_values(["avg_day_deviation", "win_rate_vs_model"], ascending=False)
         .reset_index(drop=True)
     )
 
@@ -471,11 +483,11 @@ def get_fixed_setting(
         {
             "machine_number": int(r["machine_number"]),
             "model_name": r["model_name"],
-            "win_rate": round(r["win_rate"], 4),
+            "win_rate_vs_model": round(r["win_rate_vs_model"], 4),
             "avg_diff": int(r["avg_diff"]),
             "model_avg_diff": int(r["model_avg_diff"]),
-            "diff_over_model": int(r["diff_over_model"]),
-            "consecutive_plus": int(r["consecutive_plus"]),
+            "avg_day_deviation": int(r["avg_day_deviation"]),
+            "consecutive_beat": int(r["consecutive_beat"]),
             "n_days": int(r["n_days"]),
         }
         for _, r in result.iterrows()
