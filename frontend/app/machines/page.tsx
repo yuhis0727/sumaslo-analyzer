@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import Link from "next/link";
 import EventOrNSelector, { FilterMode, EventName } from "../components/EventOrNSelector";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -136,8 +137,12 @@ export default function MachinesPage() {
                     }`}
                   >
                     <td className="px-3 py-2.5 text-gray-400 text-xs">{i + 1}</td>
-                    <td className="px-3 py-2.5 font-bold text-[#1A3A5C] text-base">{m.machine_number}番</td>
-                    <td className="px-3 py-2.5 text-gray-700 max-w-[220px] truncate">{m.model_name}</td>
+                    <td className="px-3 py-2.5 font-bold text-[#1A3A5C] text-base">
+                      <Link href={`/machines/${m.machine_number}`} className="hover:underline">{m.machine_number}番</Link>
+                    </td>
+                    <td className="px-3 py-2.5 text-gray-700 max-w-[220px] truncate">
+                      <Link href={`/models/${encodeURIComponent(m.model_name)}`} className="hover:underline hover:text-[#1A3A5C]">{m.model_name}</Link>
+                    </td>
                     <td className="px-3 py-2.5 text-center"><WinBadge rate={m.win_rate} /></td>
                     <td className="px-3 py-2.5 text-right font-medium">
                       <span className={m.avg_diff >= 0 ? "text-green-700" : "text-red-500"}>

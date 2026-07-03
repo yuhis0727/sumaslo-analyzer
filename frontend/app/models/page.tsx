@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import Link from "next/link";
 import EventOrNSelector, { FilterMode, EventName } from "../components/EventOrNSelector";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -12,6 +13,7 @@ type ModelStat = {
   win_rate: number;
   avg_diff: number;
   n_days: number;
+  monthly_avg: Record<string, number>;
 };
 
 function WinBar({ rate }: { rate: number }) {
@@ -56,6 +58,7 @@ export default function ModelsPage() {
   const handleEvent = (e: EventName) => { setEvent(e); fetch(mode, n, e); };
 
   const modeLabel = mode === "n" ? `${n}の日` : event;
+  const recentMonths = models.length > 0 ? Object.keys(models[0].monthly_avg ?? {}).sort().slice(-3) : [];
 
   return (
     <div className="space-y-5">
@@ -80,17 +83,23 @@ export default function ModelsPage() {
                 <th className="px-4 py-3 text-center">台数</th>
                 <th className="px-4 py-3 text-left">勝率</th>
                 <th className="px-4 py-3 text-right">平均差枚</th>
-                <th className="px-4 py-3 text-center">延べ日数</th>
+                {recentMonths.map(ym => (
+                  <th key={ym} className="px-3 py-3 text-right whitespace-nowrap">{ym.slice(5)}月平均</th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
-                <tr><td colSpan={6} className="text-center py-12 text-gray-400">読み込み中...</td></tr>
+                <tr><td colSpan={5 + recentMonths.length} className="text-center py-12 text-gray-400">読み込み中...</td></tr>
               ) : (
                 models.map((m, i) => (
                   <tr key={m.model_name} className={`hover:bg-gray-50 ${m.win_rate >= 0.65 ? "bg-green-50/40" : ""}`}>
                     <td className="px-4 py-2.5 text-gray-400 text-xs">{i + 1}</td>
-                    <td className="px-4 py-2.5 font-medium text-gray-800">{m.model_name}</td>
+                    <td className="px-4 py-2.5">
+                      <Link href={`/models/${encodeURIComponent(m.model_name)}`} className="font-medium text-gray-800 hover:text-[#1A3A5C] hover:underline">
+                        {m.model_name}
+                      </Link>
+                    </td>
                     <td className="px-4 py-2.5 text-center text-gray-500">{m.n_machines}台</td>
                     <td className="px-4 py-2.5"><WinBar rate={m.win_rate} /></td>
                     <td className="px-4 py-2.5 text-right">
@@ -98,7 +107,14 @@ export default function ModelsPage() {
                         {m.avg_diff >= 0 ? "+" : ""}{m.avg_diff.toLocaleString()}枚
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-center text-gray-400 text-xs">{m.n_days}日</td>
+                    {recentMonths.map(ym => {
+                      const v = m.monthly_avg?.[ym];
+                      return (
+                        <td key={ym} className={`px-3 py-2.5 text-right text-xs font-mono ${v == null ? "text-gray-300" : v >= 0 ? "text-green-600" : "text-red-400"}`}>
+                          {v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toLocaleString()}`}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))
               )}

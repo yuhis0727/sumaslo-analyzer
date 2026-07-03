@@ -279,10 +279,51 @@ def get_machine_history(
             }
         )
 
+    all_records = df[df["machine_number"] == machine_number].sort_values("date")
     win_rate = (sub["total_diff"] > 0).mean() if len(sub) else 0
     avg_diff = sub["total_diff"].mean() if len(sub) else 0
     model_map = _current_model_map(df)
     current_model = model_map.get(machine_number, sub["model_name"].mode()[0] if len(sub) else "不明")
+
+    # 月別集計（全履歴ベース・フィルタなし）
+    all_copy = all_records.copy()
+    all_copy["ym"] = all_copy["date"].dt.to_period("M")
+    monthly = (
+        all_copy.groupby("ym")["total_diff"]
+        .agg(avg_diff="mean", win_rate=lambda x: (x > 0).mean(), n=("count"))
+        .reset_index()
+    )
+    monthly_list = [
+        {
+            "month": str(r["ym"]),
+            "avg_diff": int(r["avg_diff"]),
+            "win_rate": round(r["win_rate"], 4),
+            "n": int(r["n"]),
+        }
+        for _, r in monthly.sort_values("ym").iterrows()
+    ]
+
+    # イベント別集計
+    event_stats = {}
+    for ev_name, meta in EVENT_CALENDAR.items():
+        ev_dates = [pd.Timestamp(d) for d in meta["dates"]]
+        ev_sub = all_records[all_records["date"].isin(ev_dates)]
+        if not ev_sub.empty:
+            event_stats[ev_name] = {
+                "n_days": len(ev_sub),
+                "win_rate": round(float((ev_sub["total_diff"] > 0).mean()), 4),
+                "avg_diff": int(ev_sub["total_diff"].mean()),
+            }
+    # Nの日別集計（N=1〜9）
+    n_day_stats = {}
+    for nv in range(1, 10):
+        nv_sub = all_records[all_records["date"].dt.day.isin(_event_days(nv))]
+        if not nv_sub.empty:
+            n_day_stats[str(nv)] = {
+                "n_days": len(nv_sub),
+                "win_rate": round(float((nv_sub["total_diff"] > 0).mean()), 4),
+                "avg_diff": int(nv_sub["total_diff"].mean()),
+            }
 
     return {
         "machine_number": machine_number,
@@ -293,6 +334,9 @@ def get_machine_history(
             "avg_diff": int(avg_diff) if not pd.isna(avg_diff) else 0,
             "total_diff": int(sub["total_diff"].sum()),
         },
+        "monthly": monthly_list,
+        "event_stats": event_stats,
+        "n_day_stats": n_day_stats,
         "records": records,
     }
 
@@ -321,6 +365,16 @@ def get_models(
         .reset_index()
     )
 
+    # 直近3ヶ月の月別平均差枚（全日付ベース）
+    df["ym"] = df["date"].dt.to_period("M")
+    recent_months = sorted(df["ym"].unique())[-3:]
+    monthly_avg: dict[str, dict[str, int]] = {}
+    for ym in recent_months:
+        ym_str = str(ym)
+        sub = df[df["ym"] == ym].groupby("model_name")["total_diff"].mean()
+        for model, val in sub.items():
+            monthly_avg.setdefault(model, {})[ym_str] = int(val)
+
     return [
         {
             "model_name": r["model_name"],
@@ -328,9 +382,81 @@ def get_models(
             "win_rate": round(r["win_rate"], 4),
             "avg_diff": int(r["avg_diff"]),
             "n_days": int(r["n_days"]),
+            "monthly_avg": monthly_avg.get(r["model_name"], {}),
         }
         for _, r in stats.iterrows()
     ]
+
+
+# ── /api/data/model/{name} ────────────────────────
+@router.get("/data/model/{model_name}")
+def get_model_detail(model_name: str):
+    """
+    機種詳細。
+    - 月別平均差枚（全月）
+    - 所属台番一覧と各台の勝率・平均差枚
+    """
+    df = _get_df()
+    latest_date = df["date"].max()
+    model_map = _current_model_map(df)
+
+    # 現在この機種に属する台番
+    current_machines = [num for num, name in model_map.items() if name == model_name]
+    if not current_machines:
+        raise HTTPException(status_code=404, detail=f"機種 '{model_name}' が見つかりません")
+
+    base = df[df["machine_number"].isin(current_machines)]
+
+    # 月別平均差枚
+    base = base.copy()
+    base["ym"] = base["date"].dt.to_period("M")
+    monthly = (
+        base.groupby("ym")["total_diff"]
+        .agg(avg_diff="mean", win_rate=lambda x: (x > 0).mean())
+        .reset_index()
+    )
+    monthly_list = [
+        {
+            "month": str(r["ym"]),
+            "avg_diff": int(r["avg_diff"]),
+            "win_rate": round(r["win_rate"], 4),
+        }
+        for _, r in monthly.sort_values("ym").iterrows()
+    ]
+
+    # 台番別集計
+    machine_stats = (
+        base.groupby("machine_number")
+        .agg(
+            n_days=("total_diff", "count"),
+            win_rate=("total_diff", lambda x: (x > 0).mean()),
+            avg_diff=("total_diff", "mean"),
+            total_diff=("total_diff", "sum"),
+        )
+        .sort_values(["win_rate", "avg_diff"], ascending=False)
+        .reset_index()
+    )
+
+    return {
+        "model_name": model_name,
+        "machine_count": len(current_machines),
+        "overall": {
+            "win_rate": round(float((base["total_diff"] > 0).mean()), 4),
+            "avg_diff": int(base["total_diff"].mean()),
+            "total_diff": int(base["total_diff"].sum()),
+        },
+        "monthly": monthly_list,
+        "machines": [
+            {
+                "machine_number": int(r["machine_number"]),
+                "n_days": int(r["n_days"]),
+                "win_rate": round(r["win_rate"], 4),
+                "avg_diff": int(r["avg_diff"]),
+                "total_diff": int(r["total_diff"]),
+            }
+            for _, r in machine_stats.iterrows()
+        ],
+    }
 
 
 # ── /api/data/recent ────────────────────────
