@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import EventOrNSelector, { FilterMode, EventName } from "../../components/EventOrNSelector";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -16,21 +17,22 @@ type FixedSix = {
   n_days: number;
 };
 
-const N_LABELS = [null, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
-
 export default function FixedSettingPage() {
   const [data, setData] = useState<FixedSix[]>([]);
-  const [n, setN] = useState<number | null>(7);
+  const [mode, setMode] = useState<FilterMode>("n");
+  const [n, setN] = useState(7);
+  const [event, setEvent] = useState<EventName>("ニャンギラス");
   const [minDays, setMinDays] = useState(8);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const load = async (nVal: number | null, md: number) => {
+  const load = async (m: FilterMode, nVal: number, ev: EventName, md: number) => {
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams({ min_days: String(md) });
-      if (nVal !== null) params.set("n", String(nVal));
+      if (m === "n") params.set("n", String(nVal));
+      else params.set("event", ev);
       const res = await axios.get<FixedSix[]>(`${API}/api/data/fixed-setting?${params}`);
       setData(res.data);
     } catch {
@@ -40,10 +42,12 @@ export default function FixedSettingPage() {
     }
   };
 
-  useEffect(() => { load(n, minDays); }, []);
+  useEffect(() => { load(mode, n, event, minDays); }, []);
 
-  const handleN = (v: number | null) => { setN(v); load(v, minDays); };
-  const handleMinDays = (v: number) => { setMinDays(v); load(n, v); };
+  const handleMode = (m: FilterMode) => { setMode(m); load(m, n, event, minDays); };
+  const handleN = (v: number) => { setN(v); load(mode, v, event, minDays); };
+  const handleEvent = (e: EventName) => { setEvent(e); load(mode, n, e, minDays); };
+  const handleMinDays = (v: number) => { setMinDays(v); load(mode, n, event, v); };
 
   const winColor = (r: number) =>
     r >= 0.7 ? "bg-green-100 text-green-700" :
@@ -60,22 +64,10 @@ export default function FixedSettingPage() {
       </div>
 
       <div className="flex flex-wrap gap-4 items-center">
-        <div className="flex gap-1 items-center flex-wrap">
-          <span className="text-sm text-gray-600 mr-1">Nの日:</span>
-          {N_LABELS.map((v) => (
-            <button
-              key={v ?? "all"}
-              onClick={() => handleN(v)}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                n === v
-                  ? "bg-[#1A3A5C] text-white"
-                  : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              {v === null ? "全日" : `${v}の日`}
-            </button>
-          ))}
-        </div>
+        <EventOrNSelector
+          mode={mode} n={n} event={event}
+          onModeChange={handleMode} onNChange={handleN} onEventChange={handleEvent}
+        />
 
         <div className="flex gap-1 items-center">
           <span className="text-sm text-gray-600 mr-1">最低回数:</span>

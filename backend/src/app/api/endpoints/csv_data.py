@@ -101,6 +101,22 @@ def _today_event_n() -> int:
     return 0  # 10, 20, 30日 = 対象外
 
 
+def _filter_by_event_or_n(
+    df: pd.DataFrame,
+    n: int | None,
+    event: str | None,
+) -> pd.DataFrame:
+    """event が指定されていればそのイベント日、n が指定されていれば Nの日でフィルタ。"""
+    if event is not None:
+        if event not in EVENT_CALENDAR:
+            raise HTTPException(status_code=400, detail=f"イベント '{event}' は登録されていません")
+        event_dates = [pd.Timestamp(d) for d in EVENT_CALENDAR[event]["dates"]]
+        return df[df["date"].isin(event_dates)]
+    if n is not None:
+        return df[df["date"].dt.day.isin(_event_days(n))]
+    return df
+
+
 # ── /api/data/reload ────────────────────────
 @router.post("/data/reload")
 def reload_csv():
@@ -194,14 +210,16 @@ def get_summary(n: int | None = Query(None, ge=1, le=9)):
 # ── /api/data/machines ────────────────────────
 @router.get("/data/machines")
 def get_machines(
-    n: int = Query(..., ge=1, le=9),
+    n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
     min_days: int = Query(5, ge=1),
     limit: int = Query(100, le=500),
 ):
-    """Nの日 台番別勝率一覧"""
+    """Nの日またはイベント日の台番別勝率一覧。n か event のどちらかを指定。"""
+    if n is None and event is None:
+        raise HTTPException(status_code=400, detail="n か event のどちらかを指定してください")
     df = _get_df()
-    days = _event_days(n)
-    df_n = df[df["date"].dt.day.isin(days)]
+    df_n = _filter_by_event_or_n(df, n, event)
     latest_date = df["date"].max()
     current_machines = set(df[df["date"] == latest_date]["machine_number"])
     model_map = _current_model_map(df)
@@ -236,16 +254,17 @@ def get_machines(
 
 # ── /api/data/machine/{num} ────────────────────────
 @router.get("/data/machine/{machine_number}")
-def get_machine_history(machine_number: int, n: int | None = Query(None, ge=1, le=9)):
-    """特定台番の履歴。n指定でNの日のみ絞り込み"""
+def get_machine_history(
+    machine_number: int,
+    n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
+):
+    """特定台番の履歴。n か event で絞り込み可。"""
     df = _get_df()
     sub = df[df["machine_number"] == machine_number].sort_values("date")
     if sub.empty:
         raise HTTPException(status_code=404, detail="台番が見つかりません")
-
-    if n is not None:
-        days = _event_days(n)
-        sub = sub[sub["date"].dt.day.isin(days)]
+    sub = _filter_by_event_or_n(sub, n, event)
 
     records = []
     for _, r in sub.iterrows():
@@ -280,11 +299,15 @@ def get_machine_history(machine_number: int, n: int | None = Query(None, ge=1, l
 
 # ── /api/data/models ────────────────────────
 @router.get("/data/models")
-def get_models(n: int = Query(..., ge=1, le=9)):
-    """Nの日 機種別勝率"""
+def get_models(
+    n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
+):
+    """Nの日またはイベント日の機種別勝率。n か event のどちらかを指定。"""
+    if n is None and event is None:
+        raise HTTPException(status_code=400, detail="n か event のどちらかを指定してください")
     df = _get_df()
-    days = _event_days(n)
-    df_n = df[df["date"].dt.day.isin(days)]
+    df_n = _filter_by_event_or_n(df, n, event)
 
     stats = (
         df_n.groupby("model_name")
@@ -521,14 +544,12 @@ def get_event_analysis(event: str = Query(...)):
 @router.get("/data/zentai-history")
 def get_zentai_history(
     n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
     positive_rate_threshold: float = Query(0.65, ge=0.0, le=1.0),
     min_machines: int = Query(3, ge=1),
 ):
     """
-    全台系パターン検知。
-    各Nの日ごとに「機種内プラス台割合 >= threshold かつ台数 >= min_machines」を
-    全台系と判定し、過去実績一覧を返す。
-    n指定で特定Nの日のみ、未指定で全Nの日。
+    全台系パターン検知。n か event で絞り込み可。未指定で全日付。
     """
     df = _get_df()
     latest_date = df["date"].max()
@@ -537,9 +558,7 @@ def get_zentai_history(
 
     base = df[df["machine_number"].isin(current_machines)].copy()
     base["current_model"] = base["machine_number"].map(model_map)
-
-    if n is not None:
-        base = base[base["date"].dt.day.isin(_event_days(n))]
+    base = _filter_by_event_or_n(base, n, event)
 
     # 日 × 機種ごとに集計
     day_model = (
@@ -582,14 +601,13 @@ def get_zentai_history(
 @router.get("/data/model-score")
 def get_model_score(
     n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
     positive_rate_threshold: float = Query(0.65, ge=0.0, le=1.0),
     min_machines: int = Query(3, ge=1),
     min_event_days: int = Query(5, ge=1),
 ):
     """
-    機種ごとの全台系期待度スコア。
-    zentai_rate = 全台系になった回数 / 対象Nの日の総回数
-    score = zentai_rate * avg_zentai_diff (全台系日の平均差枚)
+    機種ごとの全台系期待度スコア。n か event で絞り込み可。
     """
     df = _get_df()
     latest_date = df["date"].max()
@@ -598,9 +616,7 @@ def get_model_score(
 
     base = df[df["machine_number"].isin(current_machines)].copy()
     base["current_model"] = base["machine_number"].map(model_map)
-
-    if n is not None:
-        base = base[base["date"].dt.day.isin(_event_days(n))]
+    base = _filter_by_event_or_n(base, n, event)
 
     # 日 × 機種集計
     day_model = (
@@ -694,16 +710,14 @@ def get_layout_changes(days: int = Query(30, ge=1, le=180)):
 @router.get("/data/fixed-setting")
 def get_fixed_setting(
     n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
     min_days: int = Query(8, ge=3),
     diff_over_model: int = Query(1000, ge=0),
     consecutive: int = Query(3, ge=1),
 ):
     """
-    固定設定6台の検出。
-    全台系日のノイズを除くため「日ごとの偏差」を使う。
-      per_day_deviation = machine_diff - model_daily_avg (同じ日の機種平均)
-      win_rate_vs_model = その台が機種平均を上回った日の割合
-    全台系日は機種全体が底上げされるため偏差≈0となり自動的に除外される。
+    固定設定6台の検出。n か event で絞り込み可。
+    日ごとの偏差ベースで全台系ノイズを除去する。
     """
     df = _get_df()
     latest_date = df["date"].max()
@@ -712,8 +726,7 @@ def get_fixed_setting(
 
     base = df[df["machine_number"].isin(current_machines)].copy()
     base["current_model"] = base["machine_number"].map(model_map)
-    if n is not None:
-        base = base[base["date"].dt.day.isin(_event_days(n))]
+    base = _filter_by_event_or_n(base, n, event)
 
     # 同じ日・同じ機種（現在機種）の平均差枚
     model_daily_avg = (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import EventOrNSelector, { FilterMode, EventName } from "../../components/EventOrNSelector";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -27,25 +28,26 @@ type ZentaiHistory = {
   avg_diff: number;
 };
 
-const N_LABELS = [null, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 type Tab = "score" | "history";
 
 export default function ZentaiPage() {
   const [tab, setTab] = useState<Tab>("score");
-  const [n, setN] = useState<number | null>(7);
+  const [mode, setMode] = useState<FilterMode>("n");
+  const [n, setN] = useState(7);
+  const [event, setEvent] = useState<EventName>("ニャンギラス");
   const [scores, setScores] = useState<ModelScore[]>([]);
   const [history, setHistory] = useState<ZentaiHistory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const load = async (nVal: number | null) => {
+  const load = async (m: FilterMode, nVal: number, ev: EventName) => {
     setLoading(true);
     setError("");
     try {
-      const params = nVal !== null ? `?n=${nVal}` : "";
+      const p = m === "n" ? `n=${nVal}` : `event=${encodeURIComponent(ev)}`;
       const [scoreRes, histRes] = await Promise.all([
-        axios.get<ModelScore[]>(`${API}/api/data/model-score${params}&min_event_days=5`),
-        axios.get<ZentaiHistory[]>(`${API}/api/data/zentai-history${params}`),
+        axios.get<ModelScore[]>(`${API}/api/data/model-score?${p}&min_event_days=3`),
+        axios.get<ZentaiHistory[]>(`${API}/api/data/zentai-history?${p}`),
       ]);
       setScores(scoreRes.data);
       setHistory(histRes.data);
@@ -56,9 +58,11 @@ export default function ZentaiPage() {
     }
   };
 
-  useEffect(() => { load(n); }, []);
+  useEffect(() => { load(mode, n, event); }, []);
 
-  const handleN = (v: number | null) => { setN(v); load(v); };
+  const handleMode = (m: FilterMode) => { setMode(m); load(m, n, event); };
+  const handleN = (v: number) => { setN(v); load(mode, v, event); };
+  const handleEvent = (e: EventName) => { setEvent(e); load(mode, n, e); };
 
   const recentBadge = (cnt: number) => {
     if (cnt === 3) return <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">直近3連続</span>;
@@ -93,23 +97,10 @@ export default function ZentaiPage() {
         </p>
       </div>
 
-      {/* N選択 */}
-      <div className="flex gap-1 items-center flex-wrap">
-        <span className="text-sm text-gray-600 mr-1">Nの日:</span>
-        {N_LABELS.map((v) => (
-          <button
-            key={v ?? "all"}
-            onClick={() => handleN(v)}
-            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-              n === v
-                ? "bg-[#1A3A5C] text-white"
-                : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            {v === null ? "全日" : `${v}の日`}
-          </button>
-        ))}
-      </div>
+      <EventOrNSelector
+        mode={mode} n={n} event={event}
+        onModeChange={handleMode} onNChange={handleN} onEventChange={handleEvent}
+      />
 
       {/* タブ */}
       <div className="flex gap-0 border-b border-gray-200">
