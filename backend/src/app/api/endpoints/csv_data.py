@@ -353,6 +353,140 @@ def get_ai_context(question: str = Query(...)):
     return context
 
 
+# ── /api/data/zentai-history ────────────────────────
+@router.get("/data/zentai-history")
+def get_zentai_history(
+    n: int | None = Query(None, ge=1, le=9),
+    positive_rate_threshold: float = Query(0.65, ge=0.0, le=1.0),
+    min_machines: int = Query(3, ge=1),
+):
+    """
+    全台系パターン検知。
+    各Nの日ごとに「機種内プラス台割合 >= threshold かつ台数 >= min_machines」を
+    全台系と判定し、過去実績一覧を返す。
+    n指定で特定Nの日のみ、未指定で全Nの日。
+    """
+    df = _get_df()
+    latest_date = df["date"].max()
+    current_machines = set(df[df["date"] == latest_date]["machine_number"])
+    model_map = _current_model_map(df)
+
+    base = df[df["machine_number"].isin(current_machines)].copy()
+    base["current_model"] = base["machine_number"].map(model_map)
+
+    if n is not None:
+        base = base[base["date"].dt.day.isin(_event_days(n))]
+
+    # 日 × 機種ごとに集計
+    day_model = (
+        base.groupby(["date", "current_model"])
+        .agg(
+            total_machines=("machine_number", "nunique"),
+            plus_machines=("total_diff", lambda x: (x > 0).sum()),
+            avg_diff=("total_diff", "mean"),
+            total_diff_sum=("total_diff", "sum"),
+        )
+        .reset_index()
+    )
+    day_model["positive_rate"] = day_model["plus_machines"] / day_model["total_machines"]
+    day_model["is_zentai"] = (
+        (day_model["positive_rate"] >= positive_rate_threshold)
+        & (day_model["total_machines"] >= min_machines)
+    )
+    day_model["event_day"] = day_model["date"].dt.day.apply(
+        lambda d: d if d <= 9 else d - 10 if d <= 19 else d - 20
+    )
+
+    zentai = day_model[day_model["is_zentai"]].copy()
+    zentai["date_str"] = zentai["date"].dt.strftime("%Y-%m-%d")
+
+    return [
+        {
+            "date": r["date_str"],
+            "event_n": int(r["event_day"]),
+            "model_name": r["current_model"],
+            "total_machines": int(r["total_machines"]),
+            "plus_machines": int(r["plus_machines"]),
+            "positive_rate": round(r["positive_rate"], 4),
+            "avg_diff": int(r["avg_diff"]),
+        }
+        for _, r in zentai.sort_values("date", ascending=False).iterrows()
+    ]
+
+
+# ── /api/data/model-score ────────────────────────
+@router.get("/data/model-score")
+def get_model_score(
+    n: int | None = Query(None, ge=1, le=9),
+    positive_rate_threshold: float = Query(0.65, ge=0.0, le=1.0),
+    min_machines: int = Query(3, ge=1),
+    min_event_days: int = Query(5, ge=1),
+):
+    """
+    機種ごとの全台系期待度スコア。
+    zentai_rate = 全台系になった回数 / 対象Nの日の総回数
+    score = zentai_rate * avg_zentai_diff (全台系日の平均差枚)
+    """
+    df = _get_df()
+    latest_date = df["date"].max()
+    current_machines = set(df[df["date"] == latest_date]["machine_number"])
+    model_map = _current_model_map(df)
+
+    base = df[df["machine_number"].isin(current_machines)].copy()
+    base["current_model"] = base["machine_number"].map(model_map)
+
+    if n is not None:
+        base = base[base["date"].dt.day.isin(_event_days(n))]
+
+    # 日 × 機種集計
+    day_model = (
+        base.groupby(["date", "current_model"])
+        .agg(
+            total_machines=("machine_number", "nunique"),
+            plus_machines=("total_diff", lambda x: (x > 0).sum()),
+            avg_diff=("total_diff", "mean"),
+        )
+        .reset_index()
+    )
+    day_model["positive_rate"] = day_model["plus_machines"] / day_model["total_machines"]
+    day_model["is_zentai"] = (
+        (day_model["positive_rate"] >= positive_rate_threshold)
+        & (day_model["total_machines"] >= min_machines)
+    )
+
+    # 機種ごとにスコア集計
+    scores = []
+    for model_name, grp in day_model.groupby("current_model"):
+        total_days = len(grp)
+        if total_days < min_event_days:
+            continue
+        zentai_days = grp[grp["is_zentai"]]
+        zentai_count = len(zentai_days)
+        zentai_rate = zentai_count / total_days
+        avg_zentai_diff = int(zentai_days["avg_diff"].mean()) if zentai_count > 0 else 0
+        avg_all_diff = int(grp["avg_diff"].mean())
+        machine_count = int(grp["total_machines"].iloc[0])
+
+        # 直近3回が全台系かどうか
+        recent = grp.sort_values("date", ascending=False).head(3)
+        recent_zentai = int(recent["is_zentai"].sum())
+
+        scores.append({
+            "model_name": model_name,
+            "machine_count": machine_count,
+            "total_event_days": total_days,
+            "zentai_count": zentai_count,
+            "zentai_rate": round(zentai_rate, 4),
+            "avg_zentai_diff": avg_zentai_diff,
+            "avg_all_diff": avg_all_diff,
+            "recent_zentai_3": recent_zentai,
+            # スコア = 全台系頻度 × 全台系時の平均差枚（マイナスは0扱い）
+            "score": round(zentai_rate * max(avg_zentai_diff, 0), 1),
+        })
+
+    return sorted(scores, key=lambda x: x["score"], reverse=True)
+
+
 # ── /api/data/layout-changes ────────────────────────
 @router.get("/data/layout-changes")
 def get_layout_changes(days: int = Query(30, ge=1, le=180)):

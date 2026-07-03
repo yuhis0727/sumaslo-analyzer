@@ -1,0 +1,254 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import axios from "axios";
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
+type ModelScore = {
+  model_name: string;
+  machine_count: number;
+  total_event_days: number;
+  zentai_count: number;
+  zentai_rate: number;
+  avg_zentai_diff: number;
+  avg_all_diff: number;
+  recent_zentai_3: number;
+  score: number;
+};
+
+type ZentaiHistory = {
+  date: string;
+  event_n: number;
+  model_name: string;
+  total_machines: number;
+  plus_machines: number;
+  positive_rate: number;
+  avg_diff: number;
+};
+
+const N_LABELS = [null, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
+type Tab = "score" | "history";
+
+export default function ZentaiPage() {
+  const [tab, setTab] = useState<Tab>("score");
+  const [n, setN] = useState<number | null>(7);
+  const [scores, setScores] = useState<ModelScore[]>([]);
+  const [history, setHistory] = useState<ZentaiHistory[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const load = async (nVal: number | null) => {
+    setLoading(true);
+    setError("");
+    try {
+      const params = nVal !== null ? `?n=${nVal}` : "";
+      const [scoreRes, histRes] = await Promise.all([
+        axios.get<ModelScore[]>(`${API}/api/data/model-score${params}&min_event_days=5`),
+        axios.get<ZentaiHistory[]>(`${API}/api/data/zentai-history${params}`),
+      ]);
+      setScores(scoreRes.data);
+      setHistory(histRes.data);
+    } catch {
+      setError("APIエラー: バックエンドを確認してください");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(n); }, []);
+
+  const handleN = (v: number | null) => { setN(v); load(v); };
+
+  const recentBadge = (cnt: number) => {
+    if (cnt === 3) return <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">直近3連続</span>;
+    if (cnt === 2) return <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700">直近2/3</span>;
+    if (cnt === 1) return <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">直近1/3</span>;
+    return <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-400">直近なし</span>;
+  };
+
+  const scoreBar = (score: number, max: number) => {
+    const pct = Math.min((score / max) * 100, 100);
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex-1 bg-gray-100 rounded-full h-2">
+          <div
+            className="h-2 rounded-full bg-gradient-to-r from-blue-400 to-indigo-600"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className="text-xs font-mono text-gray-600 w-14 text-right">{score.toFixed(0)}</span>
+      </div>
+    );
+  };
+
+  const maxScore = scores[0]?.score ?? 1;
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">全台系パターン検知</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          機種内プラス台65%以上の日を全台系と判定し、頻度と期待値をスコア化します
+        </p>
+      </div>
+
+      {/* N選択 */}
+      <div className="flex gap-1 items-center flex-wrap">
+        <span className="text-sm text-gray-600 mr-1">Nの日:</span>
+        {N_LABELS.map((v) => (
+          <button
+            key={v ?? "all"}
+            onClick={() => handleN(v)}
+            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+              n === v
+                ? "bg-[#1A3A5C] text-white"
+                : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            {v === null ? "全日" : `${v}の日`}
+          </button>
+        ))}
+      </div>
+
+      {/* タブ */}
+      <div className="flex gap-0 border-b border-gray-200">
+        {(["score", "history"] as Tab[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-5 py-2 text-sm font-medium border-b-2 transition-colors ${
+              tab === t
+                ? "border-[#1A3A5C] text-[#1A3A5C]"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {t === "score" ? "期待度スコア" : "過去実績"}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">{error}</div>
+      )}
+
+      {/* 期待度スコアタブ */}
+      {tab === "score" && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="p-4 border-b border-gray-100">
+            <span className="font-semibold text-gray-700">
+              {loading ? "読み込み中..." : `${scores.length}機種`}
+            </span>
+            <span className="text-xs text-gray-400 ml-2">
+              スコア = 全台系頻度 × 全台系時の平均差枚
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 text-left">機種名</th>
+                  <th className="px-4 py-3 text-right">台数</th>
+                  <th className="px-4 py-3 text-right">全台系率</th>
+                  <th className="px-4 py-3 text-right">全台系時平均</th>
+                  <th className="px-4 py-3 text-right">直近3回</th>
+                  <th className="px-4 py-3 text-left w-48">期待度スコア</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scores.map((row, i) => (
+                  <tr key={row.model_name} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {i < 3 && (
+                          <span className={`text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                            i === 0 ? "bg-yellow-400 text-white" :
+                            i === 1 ? "bg-gray-300 text-gray-700" :
+                            "bg-amber-600 text-white"
+                          }`}>{i + 1}</span>
+                        )}
+                        <span className="font-medium text-gray-800 truncate max-w-[220px]">{row.model_name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-500">{row.machine_count}台</td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${
+                        row.zentai_rate >= 0.5 ? "bg-green-100 text-green-700" :
+                        row.zentai_rate >= 0.3 ? "bg-yellow-100 text-yellow-700" :
+                        "bg-gray-100 text-gray-500"
+                      }`}>
+                        {(row.zentai_rate * 100).toFixed(0)}%
+                        <span className="ml-1 font-normal opacity-70">({row.zentai_count}/{row.total_event_days})</span>
+                      </span>
+                    </td>
+                    <td className={`px-4 py-3 text-right font-mono font-medium ${
+                      row.avg_zentai_diff >= 0 ? "text-green-600" : "text-red-500"
+                    }`}>
+                      {row.avg_zentai_diff >= 0 ? "+" : ""}{row.avg_zentai_diff.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-right">{recentBadge(row.recent_zentai_3)}</td>
+                    <td className="px-4 py-3">{scoreBar(row.score, maxScore)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 過去実績タブ */}
+      {tab === "history" && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="p-4 border-b border-gray-100">
+            <span className="font-semibold text-gray-700">
+              {loading ? "読み込み中..." : `${history.length}件の全台系実績`}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 text-left">日付</th>
+                  <th className="px-4 py-3 text-right">N</th>
+                  <th className="px-4 py-3 text-left">機種名</th>
+                  <th className="px-4 py-3 text-right">台数</th>
+                  <th className="px-4 py-3 text-right">プラス率</th>
+                  <th className="px-4 py-3 text-right">平均差枚</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((row, i) => (
+                  <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-3 font-mono text-gray-600">{row.date}</td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="inline-block w-7 h-7 rounded-full bg-[#1A3A5C] text-white text-xs font-bold flex items-center justify-center">
+                        {row.event_n}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-gray-800 max-w-[220px] truncate">{row.model_name}</td>
+                    <td className="px-4 py-3 text-right text-gray-500">
+                      {row.plus_machines}/{row.total_machines}台
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${
+                        row.positive_rate >= 0.8 ? "bg-green-100 text-green-700" :
+                        "bg-yellow-100 text-yellow-700"
+                      }`}>
+                        {(row.positive_rate * 100).toFixed(0)}%
+                      </span>
+                    </td>
+                    <td className={`px-4 py-3 text-right font-mono font-medium ${
+                      row.avg_diff >= 0 ? "text-green-600" : "text-red-500"
+                    }`}>
+                      {row.avg_diff >= 0 ? "+" : ""}{row.avg_diff.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
