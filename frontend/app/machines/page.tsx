@@ -2,12 +2,18 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import Link from "next/link";
+import EventOrNSelector, { FilterMode, EventName } from "../components/EventOrNSelector";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
+type MachineType = "AT" | "A" | "BT";
+type TypeFilter = "all" | MachineType;
 
 type Machine = {
   machine_number: number;
   model_name: string;
+  machine_type: MachineType;
   win_rate: number;
   avg_diff: number;
   total_diff: number;
@@ -30,71 +36,90 @@ function WinBadge({ rate }: { rate: number }) {
 }
 
 export default function MachinesPage() {
+  const [mode, setMode] = useState<FilterMode>("n");
   const [n, setN] = useState(7);
+  const [event, setEvent] = useState<EventName>("ニャンギラス");
   const [minDays, setMinDays] = useState(8);
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
 
-  const fetchMachines = (eventN: number, min: number) => {
+  const buildParams = (m: FilterMode, nVal: number, ev: EventName, min: number) => {
+    const p = new URLSearchParams({ min_days: String(min), limit: "300" });
+    if (m === "n") p.set("n", String(nVal));
+    else if (m === "event") p.set("event", ev);
+    else p.set("plain", "true");
+    return p.toString();
+  };
+
+  const fetch = (m: FilterMode, nVal: number, ev: EventName, min: number) => {
     setLoading(true);
     axios
-      .get<Machine[]>(`${API}/api/data/machines?n=${eventN}&min_days=${min}&limit=300`)
+      .get<Machine[]>(`${API}/api/data/machines?${buildParams(m, nVal, ev, min)}`)
       .then((r) => setMachines(r.data))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => {
-    fetchMachines(n, minDays);
-  }, [n, minDays]);
+  useEffect(() => { fetch(mode, n, event, minDays); }, []);
+
+  const handleMode = (m: FilterMode) => { setMode(m); fetch(m, n, event, minDays); };
+  const handleN = (v: number) => { setN(v); fetch(mode, v, event, minDays); };
+  const handleEvent = (e: EventName) => { setEvent(e); fetch(mode, n, e, minDays); };
+  const handleMinDays = (v: number) => { setMinDays(v); fetch(mode, n, event, v); };
 
   const filtered = machines.filter(
     (m) =>
-      search === "" ||
-      m.machine_number.toString().includes(search) ||
-      m.model_name.includes(search)
+      (typeFilter === "all" || m.machine_type === typeFilter) &&
+      (search === "" ||
+        m.machine_number.toString().includes(search) ||
+        m.model_name.includes(search))
   );
+
+  const modeLabel = mode === "n" ? `${n}の日` : event;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-4">
         <h1 className="text-2xl font-bold text-gray-900">台番分析</h1>
 
-        {/* Nの日 選択 */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">Nの日:</span>
-          <div className="flex gap-1">
-            {[1,2,3,4,5,6,7,8,9].map((v) => (
-              <button
-                key={v}
-                onClick={() => setN(v)}
-                className={`w-8 h-8 rounded text-sm font-bold transition-colors ${
-                  n === v
-                    ? "bg-[#1A3A5C] text-white"
-                    : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
+        <EventOrNSelector
+          mode={mode} n={n} event={event}
+          onModeChange={handleMode} onNChange={handleN} onEventChange={handleEvent}
+        />
+
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          {(["all", "AT", "A", "BT"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
+                typeFilter === t
+                  ? t === "A" ? "bg-green-600 text-white"
+                  : t === "BT" ? "bg-purple-600 text-white"
+                  : t === "AT" ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t === "all" ? "全台" : t === "A" ? "Aタイプ" : t + "機"}
+            </button>
+          ))}
         </div>
 
-        {/* 最低日数 */}
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">最低日数:</span>
           <select
             value={minDays}
-            onChange={(e) => setMinDays(Number(e.target.value))}
+            onChange={(e) => handleMinDays(Number(e.target.value))}
             className="border border-gray-300 rounded px-2 py-1 text-sm"
           >
-            {[3,5,8,10].map((v) => (
+            {[3, 5, 8, 10].map((v) => (
               <option key={v} value={v}>{v}日以上</option>
             ))}
           </select>
         </div>
 
-        {/* 検索 */}
         <input
           type="text"
           placeholder="台番 or 機種名で絞り込み"
@@ -107,6 +132,9 @@ export default function MachinesPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-4 py-2 border-b border-gray-100 text-xs text-gray-400">
+          {modeLabel} の台番別勝率
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -122,17 +150,9 @@ export default function MachinesPage() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-12 text-gray-400">
-                    読み込み中...
-                  </td>
-                </tr>
+                <tr><td colSpan={7} className="text-center py-12 text-gray-400">読み込み中...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-12 text-gray-400">
-                    データなし
-                  </td>
-                </tr>
+                <tr><td colSpan={7} className="text-center py-12 text-gray-400">データなし</td></tr>
               ) : (
                 filtered.map((m, i) => (
                   <tr
@@ -144,14 +164,12 @@ export default function MachinesPage() {
                   >
                     <td className="px-3 py-2.5 text-gray-400 text-xs">{i + 1}</td>
                     <td className="px-3 py-2.5 font-bold text-[#1A3A5C] text-base">
-                      {m.machine_number}番
+                      <Link href={`/machines/${m.machine_number}`} className="hover:underline">{m.machine_number}番</Link>
                     </td>
                     <td className="px-3 py-2.5 text-gray-700 max-w-[220px] truncate">
-                      {m.model_name}
+                      <Link href={`/models/${encodeURIComponent(m.model_name)}`} className="hover:underline hover:text-[#1A3A5C]">{m.model_name}</Link>
                     </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <WinBadge rate={m.win_rate} />
-                    </td>
+                    <td className="px-3 py-2.5 text-center"><WinBadge rate={m.win_rate} /></td>
                     <td className="px-3 py-2.5 text-right font-medium">
                       <span className={m.avg_diff >= 0 ? "text-green-700" : "text-red-500"}>
                         {m.avg_diff >= 0 ? "+" : ""}{m.avg_diff.toLocaleString()}枚
@@ -160,9 +178,7 @@ export default function MachinesPage() {
                     <td className="px-3 py-2.5 text-right text-gray-500 text-xs">
                       {m.total_diff >= 0 ? "+" : ""}{m.total_diff.toLocaleString()}枚
                     </td>
-                    <td className="px-3 py-2.5 text-center text-gray-400 text-xs">
-                      {m.n_days}日
-                    </td>
+                    <td className="px-3 py-2.5 text-center text-gray-400 text-xs">{m.n_days}日</td>
                   </tr>
                 ))
               )}

@@ -57,6 +57,29 @@ def _today_events() -> list[str]:
     return [name for name, meta in EVENT_CALENDAR.items() if today_str in meta["dates"]]
 
 
+# ── 機種タイプ判定 ────────────────────────
+_BT_MACHINES: frozenset[str] = frozenset({
+    "A-SLOT+異世界かるてっとBT",
+    "L不二子BT",
+    "クレアの秘宝伝～はじまりの扉と太陽の石～ボーナストリガーver.",
+    "SHAKE BONUS TRIGGER",
+    "マジカルハロウィン ボーナストリガー",
+    "バーニングエクスプレス",
+})
+_A_KEYWORDS: tuple[str, ...] = (
+    "ジャグラー", "ハナハナ", "ハナビ", "サンダーV", "沖ドキ", "ディスクアップ", "リオエース", "バーサス",
+)
+
+
+def _model_type(name: str) -> str:
+    """機種タイプ判定: AT / A / BT (CSV に列がないため名前から推定)"""
+    if name in _BT_MACHINES:
+        return "BT"
+    if any(k in name for k in _A_KEYWORDS):
+        return "A"
+    return "AT"
+
+
 @lru_cache(maxsize=1)
 def _load_df() -> pd.DataFrame:
     if not Path(CSV_PATH).exists():
@@ -99,6 +122,41 @@ def _today_event_n() -> int:
     if day >= 21 and day <= 29:
         return day - 20
     return 0  # 10, 20, 30日 = 対象外
+
+
+# Nの日に該当する日付の日 (N=1-9 → day 1-9, 11-19, 21-29)
+_N_DAY_SET: frozenset[int] = frozenset(range(1, 10)) | frozenset(range(11, 20)) | frozenset(range(21, 30))
+
+
+def _all_event_timestamps() -> set:
+    ts: set = set()
+    for meta in EVENT_CALENDAR.values():
+        ts.update(pd.Timestamp(d) for d in meta["dates"])
+    return ts
+
+
+def _filter_by_event_or_n(
+    df: pd.DataFrame,
+    n: int | None,
+    event: str | None,
+    plain: bool = False,
+) -> pd.DataFrame:
+    """event/n/plain のいずれかでフィルタ。
+    plain=True: Nの日でもイベント日でもない平常日のみ残す。"""
+    if event is not None:
+        if event not in EVENT_CALENDAR:
+            raise HTTPException(status_code=400, detail=f"イベント '{event}' は登録されていません")
+        event_dates = [pd.Timestamp(d) for d in EVENT_CALENDAR[event]["dates"]]
+        return df[df["date"].isin(event_dates)]
+    if n is not None:
+        return df[df["date"].dt.day.isin(_event_days(n))]
+    if plain:
+        all_ev = _all_event_timestamps()
+        return df[
+            ~df["date"].isin(all_ev) &
+            ~df["date"].dt.day.isin(_N_DAY_SET)
+        ]
+    return df
 
 
 # ── /api/data/reload ────────────────────────
@@ -194,14 +252,17 @@ def get_summary(n: int | None = Query(None, ge=1, le=9)):
 # ── /api/data/machines ────────────────────────
 @router.get("/data/machines")
 def get_machines(
-    n: int = Query(..., ge=1, le=9),
+    n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
+    plain: bool = Query(False),
     min_days: int = Query(5, ge=1),
     limit: int = Query(100, le=500),
 ):
-    """Nの日 台番別勝率一覧"""
+    """Nの日/イベント日/平常日の台番別勝率一覧。n・event・plain のいずれかを指定。"""
+    if n is None and event is None and not plain:
+        raise HTTPException(status_code=400, detail="n・event・plain のいずれかを指定してください")
     df = _get_df()
-    days = _event_days(n)
-    df_n = df[df["date"].dt.day.isin(days)]
+    df_n = _filter_by_event_or_n(df, n, event, plain)
     latest_date = df["date"].max()
     current_machines = set(df[df["date"] == latest_date]["machine_number"])
     model_map = _current_model_map(df)
@@ -225,6 +286,7 @@ def get_machines(
         {
             "machine_number": int(r["machine_number"]),
             "model_name": r["model_name"],
+            "machine_type": _model_type(r["model_name"]),
             "win_rate": round(r["win_rate"], 4),
             "avg_diff": int(r["avg_diff"]),
             "total_diff": int(r["total_diff_sum"]),
@@ -236,16 +298,18 @@ def get_machines(
 
 # ── /api/data/machine/{num} ────────────────────────
 @router.get("/data/machine/{machine_number}")
-def get_machine_history(machine_number: int, n: int | None = Query(None, ge=1, le=9)):
-    """特定台番の履歴。n指定でNの日のみ絞り込み"""
+def get_machine_history(
+    machine_number: int,
+    n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
+    plain: bool = Query(False),
+):
+    """特定台番の履歴。n / event / plain で絞り込み可（省略時は全期間）。"""
     df = _get_df()
     sub = df[df["machine_number"] == machine_number].sort_values("date")
     if sub.empty:
         raise HTTPException(status_code=404, detail="台番が見つかりません")
-
-    if n is not None:
-        days = _event_days(n)
-        sub = sub[sub["date"].dt.day.isin(days)]
+    sub = _filter_by_event_or_n(sub, n, event, plain)
 
     records = []
     for _, r in sub.iterrows():
@@ -260,13 +324,67 @@ def get_machine_history(machine_number: int, n: int | None = Query(None, ge=1, l
             }
         )
 
+    all_records = df[df["machine_number"] == machine_number].sort_values("date")
     win_rate = (sub["total_diff"] > 0).mean() if len(sub) else 0
     avg_diff = sub["total_diff"].mean() if len(sub) else 0
     model_map = _current_model_map(df)
     current_model = model_map.get(machine_number, sub["model_name"].mode()[0] if len(sub) else "不明")
 
+    # 月別集計（全履歴ベース・フィルタなし）
+    all_copy = all_records.copy()
+    all_copy["ym"] = all_copy["date"].dt.to_period("M")
+    monthly = (
+        all_copy.groupby("ym")["total_diff"]
+        .agg(avg_diff="mean", win_rate=lambda x: (x > 0).mean(), n=("count"))
+        .reset_index()
+    )
+    monthly_list = [
+        {
+            "month": str(r["ym"]),
+            "avg_diff": int(r["avg_diff"]),
+            "win_rate": round(r["win_rate"], 4),
+            "n": int(r["n"]),
+        }
+        for _, r in monthly.sort_values("ym").iterrows()
+    ]
+
+    # イベント別集計
+    event_stats = {}
+    for ev_name, meta in EVENT_CALENDAR.items():
+        ev_dates = [pd.Timestamp(d) for d in meta["dates"]]
+        ev_sub = all_records[all_records["date"].isin(ev_dates)]
+        if not ev_sub.empty:
+            event_stats[ev_name] = {
+                "n_days": len(ev_sub),
+                "win_rate": round(float((ev_sub["total_diff"] > 0).mean()), 4),
+                "avg_diff": int(ev_sub["total_diff"].mean()),
+            }
+    # Nの日別集計（N=1〜9）
+    n_day_stats = {}
+    for nv in range(1, 10):
+        nv_sub = all_records[all_records["date"].dt.day.isin(_event_days(nv))]
+        if not nv_sub.empty:
+            n_day_stats[str(nv)] = {
+                "n_days": len(nv_sub),
+                "win_rate": round(float((nv_sub["total_diff"] > 0).mean()), 4),
+                "avg_diff": int(nv_sub["total_diff"].mean()),
+            }
+
+    # 平常日集計（Nの日でもイベント日でもない日）
+    plain_sub = _filter_by_event_or_n(all_records, None, None, plain=True)
+    plain_stats = (
+        {
+            "n_days": len(plain_sub),
+            "win_rate": round(float((plain_sub["total_diff"] > 0).mean()), 4),
+            "avg_diff": int(plain_sub["total_diff"].mean()),
+        }
+        if not plain_sub.empty
+        else None
+    )
+
     return {
         "machine_number": machine_number,
+        "machine_type": _model_type(current_model),
         "model_name": current_model,
         "summary": {
             "n_days": len(sub),
@@ -274,17 +392,26 @@ def get_machine_history(machine_number: int, n: int | None = Query(None, ge=1, l
             "avg_diff": int(avg_diff) if not pd.isna(avg_diff) else 0,
             "total_diff": int(sub["total_diff"].sum()),
         },
+        "monthly": monthly_list,
+        "event_stats": event_stats,
+        "n_day_stats": n_day_stats,
+        "plain_stats": plain_stats,
         "records": records,
     }
 
 
 # ── /api/data/models ────────────────────────
 @router.get("/data/models")
-def get_models(n: int = Query(..., ge=1, le=9)):
-    """Nの日 機種別勝率"""
+def get_models(
+    n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
+    plain: bool = Query(False),
+):
+    """Nの日/イベント日/平常日の機種別勝率。n・event・plain のいずれかを指定。"""
+    if n is None and event is None and not plain:
+        raise HTTPException(status_code=400, detail="n・event・plain のいずれかを指定してください")
     df = _get_df()
-    days = _event_days(n)
-    df_n = df[df["date"].dt.day.isin(days)]
+    df_n = _filter_by_event_or_n(df, n, event, plain)
 
     stats = (
         df_n.groupby("model_name")
@@ -298,16 +425,100 @@ def get_models(n: int = Query(..., ge=1, le=9)):
         .reset_index()
     )
 
+    # 直近3ヶ月の月別平均差枚（全日付ベース）
+    df["ym"] = df["date"].dt.to_period("M")
+    recent_months = sorted(df["ym"].unique())[-3:]
+    monthly_avg: dict[str, dict[str, int]] = {}
+    for ym in recent_months:
+        ym_str = str(ym)
+        sub = df[df["ym"] == ym].groupby("model_name")["total_diff"].mean()
+        for model, val in sub.items():
+            monthly_avg.setdefault(model, {})[ym_str] = int(val)
+
     return [
         {
             "model_name": r["model_name"],
+            "machine_type": _model_type(r["model_name"]),
             "n_machines": int(r["n_machines"]),
             "win_rate": round(r["win_rate"], 4),
             "avg_diff": int(r["avg_diff"]),
             "n_days": int(r["n_days"]),
+            "monthly_avg": monthly_avg.get(r["model_name"], {}),
         }
         for _, r in stats.iterrows()
     ]
+
+
+# ── /api/data/model/{name} ────────────────────────
+@router.get("/data/model/{model_name}")
+def get_model_detail(model_name: str):
+    """
+    機種詳細。
+    - 月別平均差枚（全月）
+    - 所属台番一覧と各台の勝率・平均差枚
+    """
+    df = _get_df()
+    latest_date = df["date"].max()
+    model_map = _current_model_map(df)
+
+    # 現在この機種に属する台番
+    current_machines = [num for num, name in model_map.items() if name == model_name]
+    if not current_machines:
+        raise HTTPException(status_code=404, detail=f"機種 '{model_name}' が見つかりません")
+
+    base = df[df["machine_number"].isin(current_machines)]
+
+    # 月別平均差枚
+    base = base.copy()
+    base["ym"] = base["date"].dt.to_period("M")
+    monthly = (
+        base.groupby("ym")["total_diff"]
+        .agg(avg_diff="mean", win_rate=lambda x: (x > 0).mean())
+        .reset_index()
+    )
+    monthly_list = [
+        {
+            "month": str(r["ym"]),
+            "avg_diff": int(r["avg_diff"]),
+            "win_rate": round(r["win_rate"], 4),
+        }
+        for _, r in monthly.sort_values("ym").iterrows()
+    ]
+
+    # 台番別集計
+    machine_stats = (
+        base.groupby("machine_number")
+        .agg(
+            n_days=("total_diff", "count"),
+            win_rate=("total_diff", lambda x: (x > 0).mean()),
+            avg_diff=("total_diff", "mean"),
+            total_diff=("total_diff", "sum"),
+        )
+        .sort_values(["win_rate", "avg_diff"], ascending=False)
+        .reset_index()
+    )
+
+    return {
+        "model_name": model_name,
+        "machine_type": _model_type(model_name),
+        "machine_count": len(current_machines),
+        "overall": {
+            "win_rate": round(float((base["total_diff"] > 0).mean()), 4),
+            "avg_diff": int(base["total_diff"].mean()),
+            "total_diff": int(base["total_diff"].sum()),
+        },
+        "monthly": monthly_list,
+        "machines": [
+            {
+                "machine_number": int(r["machine_number"]),
+                "n_days": int(r["n_days"]),
+                "win_rate": round(r["win_rate"], 4),
+                "avg_diff": int(r["avg_diff"]),
+                "total_diff": int(r["total_diff"]),
+            }
+            for _, r in machine_stats.iterrows()
+        ],
+    }
 
 
 # ── /api/data/recent ────────────────────────
@@ -521,14 +732,12 @@ def get_event_analysis(event: str = Query(...)):
 @router.get("/data/zentai-history")
 def get_zentai_history(
     n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
     positive_rate_threshold: float = Query(0.65, ge=0.0, le=1.0),
     min_machines: int = Query(3, ge=1),
 ):
     """
-    全台系パターン検知。
-    各Nの日ごとに「機種内プラス台割合 >= threshold かつ台数 >= min_machines」を
-    全台系と判定し、過去実績一覧を返す。
-    n指定で特定Nの日のみ、未指定で全Nの日。
+    全台系パターン検知。n か event で絞り込み可。未指定で全日付。
     """
     df = _get_df()
     latest_date = df["date"].max()
@@ -537,9 +746,7 @@ def get_zentai_history(
 
     base = df[df["machine_number"].isin(current_machines)].copy()
     base["current_model"] = base["machine_number"].map(model_map)
-
-    if n is not None:
-        base = base[base["date"].dt.day.isin(_event_days(n))]
+    base = _filter_by_event_or_n(base, n, event)
 
     # 日 × 機種ごとに集計
     day_model = (
@@ -582,14 +789,13 @@ def get_zentai_history(
 @router.get("/data/model-score")
 def get_model_score(
     n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
     positive_rate_threshold: float = Query(0.65, ge=0.0, le=1.0),
     min_machines: int = Query(3, ge=1),
     min_event_days: int = Query(5, ge=1),
 ):
     """
-    機種ごとの全台系期待度スコア。
-    zentai_rate = 全台系になった回数 / 対象Nの日の総回数
-    score = zentai_rate * avg_zentai_diff (全台系日の平均差枚)
+    機種ごとの全台系期待度スコア。n か event で絞り込み可。
     """
     df = _get_df()
     latest_date = df["date"].max()
@@ -598,9 +804,7 @@ def get_model_score(
 
     base = df[df["machine_number"].isin(current_machines)].copy()
     base["current_model"] = base["machine_number"].map(model_map)
-
-    if n is not None:
-        base = base[base["date"].dt.day.isin(_event_days(n))]
+    base = _filter_by_event_or_n(base, n, event)
 
     # 日 × 機種集計
     day_model = (
@@ -694,16 +898,14 @@ def get_layout_changes(days: int = Query(30, ge=1, le=180)):
 @router.get("/data/fixed-setting")
 def get_fixed_setting(
     n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
     min_days: int = Query(8, ge=3),
     diff_over_model: int = Query(1000, ge=0),
     consecutive: int = Query(3, ge=1),
 ):
     """
-    固定設定6台の検出。
-    全台系日のノイズを除くため「日ごとの偏差」を使う。
-      per_day_deviation = machine_diff - model_daily_avg (同じ日の機種平均)
-      win_rate_vs_model = その台が機種平均を上回った日の割合
-    全台系日は機種全体が底上げされるため偏差≈0となり自動的に除外される。
+    固定設定6台の検出。n か event で絞り込み可。
+    日ごとの偏差ベースで全台系ノイズを除去する。
     """
     df = _get_df()
     latest_date = df["date"].max()
@@ -712,8 +914,7 @@ def get_fixed_setting(
 
     base = df[df["machine_number"].isin(current_machines)].copy()
     base["current_model"] = base["machine_number"].map(model_map)
-    if n is not None:
-        base = base[base["date"].dt.day.isin(_event_days(n))]
+    base = _filter_by_event_or_n(base, n, event)
 
     # 同じ日・同じ機種（現在機種）の平均差枚
     model_daily_avg = (
