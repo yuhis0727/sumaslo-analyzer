@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import './globals.css';
 
 const NAV = [
+  { href: '/simulator',             label: '🎰 番号判定' },
   { href: '/',                      label: 'ダッシュボード' },
   { href: '/machines',              label: '台番分析' },
   { href: '/models',                label: '機種別' },
