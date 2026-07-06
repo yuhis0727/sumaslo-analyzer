@@ -30,6 +30,9 @@ type Result = {
   today_events: string[];
   strategy: string;
   data_basis: string;
+  dow_label: string;
+  dow_pattern: string;
+  dow_hint: string;
   recommendations: Rec[];
 };
 
@@ -143,6 +146,17 @@ export default function SimulatorPage() {
               </div>
             </div>
             <p className="mt-3 text-sm text-gray-700 leading-relaxed">{result.strategy}</p>
+          </div>
+
+          {/* 曜日仕掛け */}
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-3 flex items-start gap-3">
+            <div className="shrink-0 bg-indigo-600 text-white text-xs font-black px-2 py-1 rounded">
+              {result.dow_label}曜
+            </div>
+            <div>
+              <span className="font-bold text-indigo-800 text-sm">{result.dow_pattern}</span>
+              <p className="text-xs text-indigo-600 mt-0.5">{result.dow_hint}</p>
+            </div>
           </div>
 
           {/* 狙い台ランキング */}

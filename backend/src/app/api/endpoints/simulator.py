@@ -160,6 +160,18 @@ def recommend(
         for _, r in top_small.head(3).iterrows():
             push(r["machine_number"], "少数台全台系候補")
 
+    _DOW_SHIKAKE = {
+        0: ("月", "列全", "島の全台に高設定。列ごと狙える番号なら列最良台を最優先。"),
+        1: ("火", "角系", "コーナー台（島端・角番台）に集中。角番台を台番実績と照合。"),
+        2: ("水", "末尾", "台番末尾番台（X05・X10等）に集中。末尾一致台を優先。"),
+        3: ("木", "ランダム", "法則なし。データ実績台・固定設定6台を純粋に信頼。"),
+        4: ("金", "列一台以上", "各列に最低1台。列内最高実績台を押さえれば当たりやすい。"),
+        5: ("土", "3台並び末尾起点", "島の末尾から3台連続。末尾3台セットで狙う。"),
+        6: ("日", "機種1以上・3台以上対象", "3台以上設置機種のうち各機種1台以上。少数台機種は除外。"),
+    }
+    dow = today.weekday()
+    dow_label, dow_pattern, dow_hint = _DOW_SHIKAKE[dow]
+
     strategy_map = {
         "良番": "最良ポジションを確保できる番号。本命機種の最高実績台を最優先で取りに行く。本命が埋まっていた場合の第2・第3候補も把握しておく。",
         "中番": "本命は取れない前提で動く。固定設定6台と少数台全台系機種が主戦場。良番が流れた後の空きポジションを狙う。",
@@ -177,5 +189,8 @@ def recommend(
         "today_events": today_events,
         "strategy": strategy_map[tier],
         "data_basis": f"{day_label}のデータ（最低5回以上の台を対象）",
+        "dow_label": dow_label,
+        "dow_pattern": dow_pattern,
+        "dow_hint": dow_hint,
         "recommendations": recs,
     }
