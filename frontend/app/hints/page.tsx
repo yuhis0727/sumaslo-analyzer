@@ -70,7 +70,7 @@ export default function HintsPage() {
           label="ウスイ店長のXポスト"
           badge="最優先"
           badgeColor="bg-red-100 text-red-700"
-          placeholder="店長のポストをコピペ（示唆・暗号・画像の文字起こしなど）"
+          placeholder={"投稿日時ごとコピペ（例）\n7月6日 8:23 AM\n今日も頑張っていきましょう🎯\n\n→ ナナが日時を見て当日示唆か前日結果かを自動判定します"}
           value={storePost}
           onChange={setStorePost}
         />
@@ -79,7 +79,7 @@ export default function HintsPage() {
           label="ococoichi のXポスト"
           badge="解釈補助"
           badgeColor="bg-orange-100 text-orange-700"
-          placeholder="引用ツイートや解釈コメントをコピペ"
+          placeholder={"投稿日時ごとコピペ\n夜ポストは答え合わせ、朝ポストは示唆補助としてナナが解釈します"}
           value={cocochi}
           onChange={setCocochi}
         />
