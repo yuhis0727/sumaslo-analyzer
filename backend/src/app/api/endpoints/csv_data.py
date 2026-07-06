@@ -207,8 +207,8 @@ def get_summary(n: int | None = Query(None, ge=1, le=9)):
     current_machines = set(df[df["date"] == latest_date]["machine_number"])
     model_map = _current_model_map(df)
 
-    # 台番別勝率（現稼働台限定、最低8日）
-    df_n_cur = df_n[df_n["machine_number"].isin(current_machines)]
+    # 台番別勝率（現稼働台限定・現機種のみ・最低8日）
+    df_n_cur = _filter_current_model_only(df_n[df_n["machine_number"].isin(current_machines)])
     machine_stats = (
         df_n_cur.groupby("machine_number")
         .agg(
@@ -268,14 +268,15 @@ def get_machines(
     n: int | None = Query(None, ge=1, le=9),
     event: str | None = Query(None),
     plain: bool = Query(False),
+    all_days: bool = Query(False),
     min_days: int = Query(5, ge=1),
     limit: int = Query(100, le=500),
 ):
-    """Nの日/イベント日/平常日の台番別勝率一覧。n・event・plain のいずれかを指定。"""
-    if n is None and event is None and not plain:
-        raise HTTPException(status_code=400, detail="n・event・plain のいずれかを指定してください")
+    """Nの日/イベント日/平常日/全期間の台番別勝率一覧。"""
+    if n is None and event is None and not plain and not all_days:
+        raise HTTPException(status_code=400, detail="n・event・plain・all_days のいずれかを指定してください")
     df = _get_df()
-    df_n = _filter_by_event_or_n(df, n, event, plain)
+    df_n = df.copy() if all_days else _filter_by_event_or_n(df, n, event, plain)
     latest_date = df["date"].max()
     current_machines = set(df[df["date"] == latest_date]["machine_number"])
     model_map = _current_model_map(df)
@@ -487,10 +488,9 @@ def get_model_detail(model_name: str):
     if not current_machines:
         raise HTTPException(status_code=404, detail=f"機種 '{model_name}' が見つかりません")
 
-    base = df[df["machine_number"].isin(current_machines)]
+    base = _filter_current_model_only(df[df["machine_number"].isin(current_machines)]).copy()
 
     # 月別平均差枚
-    base = base.copy()
     base["ym"] = base["date"].dt.to_period("M")
     monthly = (
         base.groupby("ym")["total_diff"]
@@ -600,7 +600,7 @@ def get_ai_context(question: str = Query(...)):
         current = set(df[df["date"] == latest_date]["machine_number"])
         model_map = _current_model_map(df)
         top = (
-            df_n[df_n["machine_number"].isin(current)]
+            _filter_current_model_only(df_n[df_n["machine_number"].isin(current)])
             .groupby("machine_number")
             .agg(
                 win_rate=("total_diff", lambda x: (x > 0).mean()),
@@ -686,7 +686,9 @@ def get_event_analysis(event: str = Query(...)):
     ]
 
     # 現在稼働台限定で機種別集計
-    cur_event_df = event_df[event_df["machine_number"].isin(current_machines)].copy()
+    cur_event_df = _filter_current_model_only(
+        event_df[event_df["machine_number"].isin(current_machines)]
+    ).copy()
     cur_event_df["current_model"] = cur_event_df["machine_number"].map(model_map)
 
     top_models = (
@@ -765,7 +767,7 @@ def get_zentai_history(
     current_machines = set(df[df["date"] == latest_date]["machine_number"])
     model_map = _current_model_map(df)
 
-    base = df[df["machine_number"].isin(current_machines)].copy()
+    base = _filter_current_model_only(df[df["machine_number"].isin(current_machines)]).copy()
     base["current_model"] = base["machine_number"].map(model_map)
     base = _filter_by_event_or_n(base, n, event)
 
@@ -823,7 +825,7 @@ def get_model_score(
     current_machines = set(df[df["date"] == latest_date]["machine_number"])
     model_map = _current_model_map(df)
 
-    base = df[df["machine_number"].isin(current_machines)].copy()
+    base = _filter_current_model_only(df[df["machine_number"].isin(current_machines)]).copy()
     base["current_model"] = base["machine_number"].map(model_map)
     base = _filter_by_event_or_n(base, n, event)
 

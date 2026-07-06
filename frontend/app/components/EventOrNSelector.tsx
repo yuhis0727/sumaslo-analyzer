@@ -1,6 +1,6 @@
 "use client";
 
-export type FilterMode = "n" | "event" | "plain";
+export type FilterMode = "n" | "event" | "plain" | "all";
 export const EVENT_NAMES = ["ニャンギラス", "大田区活性化", "ファン感謝デー"] as const;
 export type EventName = typeof EVENT_NAMES[number];
 
@@ -13,12 +13,19 @@ type Props = {
   onEventChange: (e: EventName) => void;
 };
 
+const LABEL: Record<FilterMode, string> = {
+  n: "Nの日",
+  event: "イベント",
+  plain: "平常日",
+  all: "全期間",
+};
+
 export default function EventOrNSelector({ mode, n, event, onModeChange, onNChange, onEventChange }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       {/* モード切替 */}
       <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-medium">
-        {(["n", "event", "plain"] as FilterMode[]).map((m) => (
+        {(["n", "event", "plain", "all"] as FilterMode[]).map((m) => (
           <button
             key={m}
             onClick={() => onModeChange(m)}
@@ -26,11 +33,13 @@ export default function EventOrNSelector({ mode, n, event, onModeChange, onNChan
               mode === m
                 ? m === "plain"
                   ? "bg-gray-600 text-white"
+                  : m === "all"
+                  ? "bg-slate-500 text-white"
                   : "bg-[#1A3A5C] text-white"
                 : "bg-white text-gray-600 hover:bg-gray-50"
             }`}
           >
-            {m === "n" ? "Nの日" : m === "event" ? "イベント" : "平常日"}
+            {LABEL[m]}
           </button>
         ))}
       </div>
@@ -76,6 +85,11 @@ export default function EventOrNSelector({ mode, n, event, onModeChange, onNChan
       {/* 平常日: 説明テキスト */}
       {mode === "plain" && (
         <span className="text-xs text-gray-400">Nの日・イベント日を除いた日（10日・20日・非イベント30/31日）</span>
+      )}
+
+      {/* 全期間: 説明テキスト */}
+      {mode === "all" && (
+        <span className="text-xs text-gray-400">全日程合算（新台など日数が少ない台の確認に）</span>
       )}
     </div>
   );

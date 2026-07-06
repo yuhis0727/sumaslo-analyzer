@@ -49,7 +49,8 @@ export default function MachinesPage() {
     const p = new URLSearchParams({ min_days: String(min), limit: "300" });
     if (m === "n") p.set("n", String(nVal));
     else if (m === "event") p.set("event", ev);
-    else p.set("plain", "true");
+    else if (m === "plain") p.set("plain", "true");
+    else p.set("all_days", "true");
     return p.toString();
   };
 
@@ -76,7 +77,10 @@ export default function MachinesPage() {
         m.model_name.includes(search))
   );
 
-  const modeLabel = mode === "n" ? `${n}の日` : event;
+  const modeLabel =
+    mode === "n" ? `${n}の日` :
+    mode === "event" ? event :
+    mode === "plain" ? "平常日" : "全期間";
 
   return (
     <div className="space-y-5">
