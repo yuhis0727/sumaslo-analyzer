@@ -85,7 +85,7 @@ def _build_today_context() -> str:
     from .csv_data import (
         _get_df, _today_event_n, _today_events, _event_days,
         _current_model_map, _model_type, DOW_JP, EVENT_CALENDAR,
-        _all_event_timestamps, _N_DAY_SET,
+        _all_event_timestamps, _N_DAY_SET, _filter_current_model_only,
     )
 
     df = _get_df()
@@ -125,9 +125,9 @@ def _build_today_context() -> str:
                 avg = int(sub["total_diff"].mean())
                 lines.append(f"  {label}: 勝率{wr*100:.0f}% / 平均{avg:+,}枚 / {len(sub)}台日")
 
-        # 台番別TOP20
+        # 台番別TOP20（現機種のデータのみ）
         top = (
-            df_n[df_n["machine_number"].isin(current)]
+            _filter_current_model_only(df_n[df_n["machine_number"].isin(current)])
             .groupby("machine_number")
             .agg(
                 win_rate=("total_diff", lambda x: (x > 0).mean()),
@@ -155,17 +155,17 @@ def _build_today_context() -> str:
         df_plain = df[~df["date"].isin(all_ev) & ~df["date"].dt.day.isin(_N_DAY_SET)].copy()
         df_plain["mtype"] = df_plain["model_name"].map(_model_type)
 
-        # 全期間の機種別日平均
+        # 全期間の機種別日平均（現機種のデータのみ）
+        df_cur = _filter_current_model_only(df[df["machine_number"].isin(current)])
         model_daily_avg = (
-            df.groupby(["date", "model_name"])["total_diff"].mean().reset_index()
+            df_cur.groupby(["date", "model_name"])["total_diff"].mean().reset_index()
             .rename(columns={"total_diff": "model_avg"})
         )
-        df_dev = df.merge(model_daily_avg, on=["date", "model_name"])
+        df_dev = df_cur.merge(model_daily_avg, on=["date", "model_name"])
         df_dev["deviation"] = df_dev["total_diff"] - df_dev["model_avg"]
 
         dev_stats = (
-            df_dev[df_dev["machine_number"].isin(current)]
-            .groupby("machine_number")
+            df_dev.groupby("machine_number")
             .agg(
                 avg_dev=("deviation", "mean"),
                 n_days=("deviation", "count"),

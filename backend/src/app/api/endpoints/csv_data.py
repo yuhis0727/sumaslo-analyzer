@@ -113,6 +113,19 @@ def _current_model_map(df: pd.DataFrame) -> dict[int, str]:
     return dict(zip(latest["machine_number"], latest["model_name"]))
 
 
+def _filter_current_model_only(df: pd.DataFrame) -> pd.DataFrame:
+    """各台番について現在の機種名のデータのみに絞る。
+    配置変更前の別機種データを除外し、台番実績の混在を防ぐ。"""
+    latest_date = df["date"].max()
+    current = (
+        df[df["date"] == latest_date][["machine_number", "model_name"]]
+        .rename(columns={"model_name": "current_model"})
+        .drop_duplicates("machine_number")
+    )
+    merged = df.merge(current, on="machine_number", how="inner")
+    return merged[merged["model_name"] == merged["current_model"]].drop(columns=["current_model"])
+
+
 def _today_event_n() -> int:
     day = date.today().day
     if day >= 1 and day <= 9:
@@ -266,7 +279,8 @@ def get_machines(
     latest_date = df["date"].max()
     current_machines = set(df[df["date"] == latest_date]["machine_number"])
     model_map = _current_model_map(df)
-    df_n = df_n[df_n["machine_number"].isin(current_machines)]
+    # 現在の機種名のデータのみに絞る（配置変更前の旧機種データを除外）
+    df_n = _filter_current_model_only(df_n[df_n["machine_number"].isin(current_machines)])
 
     stats = (
         df_n.groupby("machine_number")
@@ -324,14 +338,21 @@ def get_machine_history(
             }
         )
 
-    all_records = df[df["machine_number"] == machine_number].sort_values("date")
-    win_rate = (sub["total_diff"] > 0).mean() if len(sub) else 0
-    avg_diff = sub["total_diff"].mean() if len(sub) else 0
     model_map = _current_model_map(df)
     current_model = model_map.get(machine_number, sub["model_name"].mode()[0] if len(sub) else "不明")
 
-    # 月別集計（全履歴ベース・フィルタなし）
-    all_copy = all_records.copy()
+    # 全履歴（機種変更の表示用）
+    all_records = df[df["machine_number"] == machine_number].sort_values("date")
+    # 現機種のデータのみ（統計用）
+    current_records = all_records[all_records["model_name"] == current_model]
+
+    # フィルタ済みsub も現機種のみに絞る
+    sub = sub[sub["model_name"] == current_model]
+    win_rate = (sub["total_diff"] > 0).mean() if len(sub) else 0
+    avg_diff = sub["total_diff"].mean() if len(sub) else 0
+
+    # 月別集計（現機種のみ・フィルタなし）
+    all_copy = current_records.copy()
     all_copy["ym"] = all_copy["date"].dt.to_period("M")
     monthly = (
         all_copy.groupby("ym")["total_diff"]
@@ -348,21 +369,21 @@ def get_machine_history(
         for _, r in monthly.sort_values("ym").iterrows()
     ]
 
-    # イベント別集計
+    # イベント別集計（現機種のみ）
     event_stats = {}
     for ev_name, meta in EVENT_CALENDAR.items():
         ev_dates = [pd.Timestamp(d) for d in meta["dates"]]
-        ev_sub = all_records[all_records["date"].isin(ev_dates)]
+        ev_sub = current_records[current_records["date"].isin(ev_dates)]
         if not ev_sub.empty:
             event_stats[ev_name] = {
                 "n_days": len(ev_sub),
                 "win_rate": round(float((ev_sub["total_diff"] > 0).mean()), 4),
                 "avg_diff": int(ev_sub["total_diff"].mean()),
             }
-    # Nの日別集計（N=1〜9）
+    # Nの日別集計（N=1〜9）（現機種のみ）
     n_day_stats = {}
     for nv in range(1, 10):
-        nv_sub = all_records[all_records["date"].dt.day.isin(_event_days(nv))]
+        nv_sub = current_records[current_records["date"].dt.day.isin(_event_days(nv))]
         if not nv_sub.empty:
             n_day_stats[str(nv)] = {
                 "n_days": len(nv_sub),
@@ -370,8 +391,8 @@ def get_machine_history(
                 "avg_diff": int(nv_sub["total_diff"].mean()),
             }
 
-    # 平常日集計（Nの日でもイベント日でもない日）
-    plain_sub = _filter_by_event_or_n(all_records, None, None, plain=True)
+    # 平常日集計（現機種のみ）
+    plain_sub = _filter_by_event_or_n(current_records, None, None, plain=True)
     plain_stats = (
         {
             "n_days": len(plain_sub),
@@ -912,7 +933,8 @@ def get_fixed_setting(
     current_machines = set(df[df["date"] == latest_date]["machine_number"])
     model_map = _current_model_map(df)
 
-    base = df[df["machine_number"].isin(current_machines)].copy()
+    base = _filter_current_model_only(df[df["machine_number"].isin(current_machines)])
+    base = base.copy()
     base["current_model"] = base["machine_number"].map(model_map)
     base = _filter_by_event_or_n(base, n, event)
 

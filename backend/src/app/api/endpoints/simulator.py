@@ -12,6 +12,7 @@ from fastapi import APIRouter, Query
 from .csv_data import (
     _event_days, _get_df, _model_type, _today_event_n, _today_events,
     _current_model_map, _all_event_timestamps, _N_DAY_SET, EVENT_CALENDAR,
+    _filter_current_model_only,
 )
 
 router = APIRouter()
@@ -29,15 +30,17 @@ def _tier(number: int, total: int) -> tuple[str, float]:
 
 def _fixed6_machines(df: pd.DataFrame, current: set[int]) -> set[int]:
     """機種日次平均との偏差が安定してプラスの台（固定設定6候補）"""
+    from .csv_data import _filter_current_model_only
+    # 現在の機種名のデータのみを使う（旧機種データを除外）
+    df_cur = _filter_current_model_only(df[df["machine_number"].isin(current)])
     model_daily = (
-        df.groupby(["date", "model_name"])["total_diff"]
+        df_cur.groupby(["date", "model_name"])["total_diff"]
         .mean().reset_index().rename(columns={"total_diff": "model_avg"})
     )
-    dev = df.merge(model_daily, on=["date", "model_name"])
+    dev = df_cur.merge(model_daily, on=["date", "model_name"])
     dev["deviation"] = dev["total_diff"] - dev["model_avg"]
     stats = (
-        dev[dev["machine_number"].isin(current)]
-        .groupby("machine_number")
+        dev.groupby("machine_number")
         .agg(avg_dev=("deviation", "mean"), n=("deviation", "count"))
         .query("n >= 30 and avg_dev >= 500")
     )
@@ -75,6 +78,8 @@ def recommend(
         day_label = "平常日"
 
     base = base[base["machine_number"].isin(current)].copy()
+    # 現在の機種名のデータのみに絞る（配置変更前の旧機種データを除外）
+    base = _filter_current_model_only(base)
 
     # 台番別集計（最低5日）
     mstats = (
