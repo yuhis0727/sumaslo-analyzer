@@ -104,7 +104,16 @@ export default function HintsPage() {
           <textarea
             value={storePost}
             onChange={(e) => setStorePost(e.target.value)}
-            placeholder={"投稿日時ごとコピペ（例）\n7月6日 8:23 AM\n今日も頑張っていきましょう🎯\n\n→ ナナが日時を見て当日示唆か前日結果かを自動判定します"}
+            onPaste={(e) => {
+              const hasImage = Array.from(e.clipboardData.items).some((i) => i.type.startsWith("image/"));
+              if (hasImage) {
+                e.preventDefault();
+                Array.from(e.clipboardData.items).forEach((item) => {
+                  if (item.type.startsWith("image/")) { const f = item.getAsFile(); if (f) storeImgs.addFile(f); }
+                });
+              }
+            }}
+            placeholder={"投稿日時ごとコピペ（例）\n7月6日 8:23 AM\n今日も頑張っていきましょう🎯\n\n→ ナナが日時を見て当日示唆か前日結果かを自動判定します\n画像コピー中にここでCtrl+Vすると画像として追加されます"}
             rows={3}
             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A3A5C]/30 resize-y text-gray-700 placeholder-gray-300"
           />
@@ -124,7 +133,16 @@ export default function HintsPage() {
           <textarea
             value={cocochi}
             onChange={(e) => setCocochi(e.target.value)}
-            placeholder={"投稿日時ごとコピペ\n夜ポストは答え合わせ、朝ポストは示唆補助としてナナが解釈します"}
+            onPaste={(e) => {
+              const hasImage = Array.from(e.clipboardData.items).some((i) => i.type.startsWith("image/"));
+              if (hasImage) {
+                e.preventDefault();
+                Array.from(e.clipboardData.items).forEach((item) => {
+                  if (item.type.startsWith("image/")) { const f = item.getAsFile(); if (f) cococoImgs.addFile(f); }
+                });
+              }
+            }}
+            placeholder={"投稿日時ごとコピペ\n夜ポストは答え合わせ、朝ポストは示唆補助としてナナが解釈します\n画像コピー中にここでCtrl+Vすると画像として追加されます"}
             rows={3}
             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A3A5C]/30 resize-y text-gray-700 placeholder-gray-300"
           />
