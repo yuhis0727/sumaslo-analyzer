@@ -220,12 +220,12 @@ def _build_today_context() -> str:
     except Exception:
         pass
 
-    # ── 示唆情報（ウスイ店長X・ococoichi・LINE）──
+    # ── 示唆テキスト（ウスイ店長X・ococoichi・LINE）──
     try:
         from .hints import get_today_hints_context
-        hints_ctx = get_today_hints_context()
-        if hints_ctx:
-            lines.append(f"\n=== 本日の示唆情報（最優先） ===\n{hints_ctx}")
+        hints_text, _ = get_today_hints_context()
+        if hints_text:
+            lines.append(f"\n=== 本日の示唆情報（最優先） ===\n{hints_text}")
     except Exception:
         pass
 
@@ -263,6 +263,33 @@ async def chat(req: ChatRequest):
         for m in req.history
         if m.role in ("user", "assistant")
     ]
+
+    # 示唆画像を会話の先頭に注入（履歴がない初回のみ、画像がある場合）
+    if not req.history:
+        try:
+            from .hints import get_today_hints_context
+            _, image_blocks = get_today_hints_context()
+            if image_blocks:
+                img_content: list[dict] = []
+                for blk in image_blocks:
+                    img_content.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": blk["media_type"],
+                            "data": blk["data"],
+                        },
+                    })
+                    img_content.append({"type": "text", "text": f"↑ {blk['label']}"})
+                img_content.append({
+                    "type": "text",
+                    "text": "上記は本日の示唆画像です。内容をすべて読み取り、今日の狙い台判断に最優先で使ってください。",
+                })
+                messages.insert(0, {"role": "user", "content": img_content})
+                messages.insert(1, {"role": "assistant", "content": "示唆画像を確認しました。内容を読み取り、今日の立ち回りの参考にします。"})
+        except Exception:
+            pass
+
     messages.append({"role": "user", "content": req.message})
 
     async def generate():

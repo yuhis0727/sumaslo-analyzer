@@ -39,6 +39,8 @@ class HintPayload(BaseModel):
     store_post: str = ""
     cocochi: str = ""
     openchat: str = ""
+    store_images: list[str] = []   # base64 文字列のリスト（data URL形式: "data:image/jpeg;base64,..."）
+    cocochi_images: list[str] = []
 
 
 class HintResponse(BaseModel):
@@ -47,6 +49,8 @@ class HintResponse(BaseModel):
     cocochi: str
     openchat: str
     saved_at: str | None
+    has_store_images: bool = False
+    has_cocochi_images: bool = False
 
 
 @router.get("/hints/today", response_model=HintResponse)
@@ -61,6 +65,8 @@ def get_today_hints():
         cocochi=entry.get("cocochi", ""),
         openchat=entry.get("openchat", ""),
         saved_at=entry.get("saved_at"),
+        has_store_images=bool(entry.get("store_images")),
+        has_cocochi_images=bool(entry.get("cocochi_images")),
     )
 
 
@@ -73,6 +79,8 @@ def save_today_hints(payload: HintPayload):
         "store_post": payload.store_post,
         "cocochi": payload.cocochi,
         "openchat": payload.openchat,
+        "store_images": payload.store_images,
+        "cocochi_images": payload.cocochi_images,
         "saved_at": datetime.now().isoformat(timespec="minutes"),
     }
     _save(data)
@@ -82,11 +90,13 @@ def save_today_hints(payload: HintPayload):
         cocochi=payload.cocochi,
         openchat=payload.openchat,
         saved_at=data[today]["saved_at"],
+        has_store_images=bool(payload.store_images),
+        has_cocochi_images=bool(payload.cocochi_images),
     )
 
 
-def get_today_hints_context() -> str:
-    """ai_chat.py から呼ばれる。今日の示唆テキストをコンテキスト文字列で返す。"""
+def get_today_hints_context() -> tuple[str, list[dict]]:
+    """ai_chat.py から呼ばれる。(テキスト文字列, Claudeイメージブロックリスト) を返す。"""
     today = date.today().isoformat()
     data = _load()
     entry = data.get(today, {})
@@ -99,6 +109,21 @@ def get_today_hints_context() -> str:
     if entry.get("openchat"):
         lines.append(f"【LINEオープンチャット情報（{today}）】\n{entry['openchat']}")
 
-    if not lines:
-        return ""
-    return "\n\n".join(lines)
+    text = "\n\n".join(lines)
+
+    # 画像ブロック構築（Claude Vision API 形式）
+    image_blocks: list[dict] = []
+    for label, key in [("ウスイ店長", "store_images"), ("ococoichi", "cocochi_images")]:
+        for i, data_url in enumerate(entry.get(key, []), 1):
+            # data:image/jpeg;base64,XXXX → media_type と data に分解
+            if "," not in data_url:
+                continue
+            header, b64data = data_url.split(",", 1)
+            media_type = header.split(";")[0].replace("data:", "") or "image/jpeg"
+            image_blocks.append({
+                "label": f"{label}の示唆画像{i}",
+                "media_type": media_type,
+                "data": b64data,
+            })
+
+    return text, image_blocks
