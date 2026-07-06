@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import axios from "axios";
+import { useEffect, useRef, useState } from "react";
+import Markdown from "react-markdown";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -12,43 +12,90 @@ type Message = {
 
 const SUGGESTIONS = [
   "今日のおすすめ台は？",
-  "7の日で一番勝率高い台番は？",
-  "2026番の最近の成績は？",
-  "全台系になりやすい機種は？",
+  "良番（上位10番）で何を狙う？",
+  "悪番でも狙える台は？",
+  "今日の固定設定6候補は？",
 ];
 
 export default function AIPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      text: "マルハン蒲田7の分析AIです。台番・Nの日の勝率・おすすめ台などについて聞いてください。\n\n※ Claude APIキー設定後に本格稼働します（現在はデモ応答）",
+      text: "ナナです。マルハン蒲田7の立ち回りを担当します。\n抽選番号を引いた後に「○番引いた。今日のおすすめは？」と聞いてください。\n\n店長ポスト（X）の内容があれば一緒に貼ると精度が上がります。",
     },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return;
+
     const userMsg: Message = { role: "user", text };
-    setMessages((prev) => [...prev, userMsg]);
+    const history = messages
+      .slice(1)
+      .map(m => ({ role: m.role, content: m.text }));
+
+    setMessages(prev => [...prev, userMsg, { role: "assistant", text: "" }]);
     setInput("");
     setLoading(true);
 
     try {
-      // コンテキスト取得
-      const ctx = await axios.get(`${API}/api/data/ai-context?question=${encodeURIComponent(text)}`);
-      const context = ctx.data;
+      const resp = await fetch(`${API}/api/ai/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, history }),
+      });
 
-      // TODO: Claude API呼び出し（APIキー設定後に実装）
-      // 現在はコンテキストベースのルールベース応答
-      const reply = buildMockReply(text, context);
+      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
 
-      setMessages((prev) => [...prev, { role: "assistant", text: reply }]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: "APIエラーが発生しました。バックエンドの接続を確認してください。" },
-      ]);
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6).trim();
+          if (payload === "[DONE]") break;
+          try {
+            const { text: chunk, error } = JSON.parse(payload);
+            if (error) throw new Error(error);
+            if (chunk) {
+              setMessages(prev => {
+                const next = [...prev];
+                next[next.length - 1] = {
+                  role: "assistant",
+                  text: next[next.length - 1].text + chunk,
+                };
+                return next;
+              });
+            }
+          } catch {
+            // JSON parse error — skip malformed chunk
+          }
+        }
+      }
+    } catch (e) {
+      setMessages(prev => {
+        const next = [...prev];
+        next[next.length - 1] = {
+          role: "assistant",
+          text: `エラー: ${e instanceof Error ? e.message : "通信エラー"}`,
+        };
+        return next;
+      });
     } finally {
       setLoading(false);
     }
@@ -57,54 +104,76 @@ export default function AIPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">AI社員</h1>
-        <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-medium">
-          β版・デモ応答中
+        <h1 className="text-2xl font-bold text-gray-900">ナナ</h1>
+        <span className="text-sm text-gray-400">AI立ち回り支援</span>
+        <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">
+          Claude Sonnet 稼働中
         </span>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[600px]">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[640px]">
         {/* メッセージ一覧 */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {messages.map((m, i) => (
-            <div
-              key={i}
-              className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-            >
+            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed ${
+                className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
                   m.role === "user"
-                    ? "bg-[#1A3A5C] text-white rounded-br-none"
+                    ? "bg-[#1A3A5C] text-white rounded-br-none whitespace-pre-wrap leading-relaxed"
                     : "bg-gray-100 text-gray-800 rounded-bl-none"
                 }`}
               >
                 {m.role === "assistant" && (
-                  <div className="text-xs text-gray-400 mb-1 font-medium">🤖 AI社員</div>
+                  <div className="text-xs text-gray-400 mb-1.5 font-medium">ナナ</div>
                 )}
-                {m.text}
+                {m.role === "user" ? (
+                  m.text
+                ) : m.text ? (
+                  <Markdown
+                    components={{
+                      h1: ({ children }) => <h1 className="text-base font-bold mt-3 mb-1 text-gray-900 border-b border-gray-300 pb-1">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-sm font-bold mt-3 mb-1 text-gray-800">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-sm font-semibold mt-2 mb-0.5 text-gray-700">{children}</h3>,
+                      p: ({ children }) => <p className="my-1 leading-relaxed">{children}</p>,
+                      strong: ({ children }) => <strong className="font-bold text-gray-900">{children}</strong>,
+                      ul: ({ children }) => <ul className="my-1 ml-4 list-disc space-y-0.5">{children}</ul>,
+                      ol: ({ children }) => <ol className="my-1 ml-4 list-decimal space-y-0.5">{children}</ol>,
+                      li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                      hr: () => <hr className="my-2 border-gray-300" />,
+                      table: ({ children }) => (
+                        <div className="overflow-x-auto my-2">
+                          <table className="text-xs border-collapse w-full">{children}</table>
+                        </div>
+                      ),
+                      thead: ({ children }) => <thead className="bg-gray-200">{children}</thead>,
+                      th: ({ children }) => <th className="border border-gray-300 px-2 py-1 text-left font-semibold">{children}</th>,
+                      td: ({ children }) => <td className="border border-gray-300 px-2 py-1">{children}</td>,
+                      code: ({ children }) => <code className="bg-gray-200 rounded px-1 font-mono text-xs">{children}</code>,
+                    }}
+                  >
+                    {m.text}
+                  </Markdown>
+                ) : loading && i === messages.length - 1 ? (
+                  <span className="inline-flex gap-1 py-1">
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </span>
+                ) : null}
               </div>
             </div>
           ))}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-100 rounded-2xl rounded-bl-none px-4 py-3">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                </div>
-              </div>
-            </div>
-          )}
+          <div ref={bottomRef} />
         </div>
 
         {/* サジェスト */}
         <div className="px-5 pb-2 flex flex-wrap gap-2">
-          {SUGGESTIONS.map((s) => (
+          {SUGGESTIONS.map(s => (
             <button
               key={s}
               onClick={() => send(s)}
-              className="bg-gray-50 border border-gray-200 text-gray-700 text-xs px-3 py-1 rounded-full hover:bg-blue-50 hover:border-blue-300 transition-colors"
+              disabled={loading}
+              className="bg-gray-50 border border-gray-200 text-gray-700 text-xs px-3 py-1 rounded-full hover:bg-blue-50 hover:border-blue-300 transition-colors disabled:opacity-40"
             >
               {s}
             </button>
@@ -117,10 +186,11 @@ export default function AIPage() {
             <input
               type="text"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send(input)}
-              placeholder="質問を入力（例: 7の日で一番強い台番は？）"
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && !e.shiftKey && send(input)}
+              placeholder="例: 35番引いた。今日7の日で何を狙う？"
               className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A5C]/30"
+              disabled={loading}
             />
             <button
               onClick={() => send(input)}
@@ -134,34 +204,4 @@ export default function AIPage() {
       </div>
     </div>
   );
-}
-
-function buildMockReply(question: string, ctx: Record<string, unknown>): string {
-  const today = ctx.today as string;
-  const dow = ctx.day_of_week as string;
-  const eventN = ctx.event_n as number | null;
-  const picks = ctx.top_picks as Array<{ num: number; model: string; win: string; avg: string }> | undefined;
-
-  if (question.includes("おすすめ") || question.includes("今日")) {
-    if (!eventN) {
-      return `今日（${today} ${dow}曜）は通常日です。Nの日ではないため、特定のイベントパターンには当てはまりません。`;
-    }
-    const list = picks?.slice(0, 5).map((p, i) =>
-      `${i + 1}. **${p.num}番**（${p.model.slice(0, 15)}）勝率${p.win} 平均${p.avg}`
-    ).join("\n") ?? "データ取得中";
-    return `今日は${dow}曜・${eventN}の日です。\n\nおすすめ台TOP5:\n${list}\n\nデータは ${ctx.latest_data_date} まで反映済みです。`;
-  }
-
-  if (question.includes("全台系")) {
-    return `全台系の判定は「実際の稼働台数が7台の機種」が基準の一つです。\n当日のみんレポで各機種の稼働台数を確認し、7台稼働機種に注目してください。`;
-  }
-
-  if (question.includes("勝率")) {
-    if (eventN && picks && picks.length > 0) {
-      const top = picks[0];
-      return `${eventN}の日の最高勝率台は **${top.num}番**（${top.model.slice(0, 20)}）で勝率${top.win}、平均${top.avg}です。`;
-    }
-  }
-
-  return `「${question}」について分析します。\n\nClaude APIキーを設定すると、より詳細な分析・推論が可能になります。現在はデモ応答中です。\n\n台番分析ページや機種別ページで直接データを確認することをお勧めします。`;
 }
