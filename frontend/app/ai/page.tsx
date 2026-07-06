@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Markdown from "react-markdown";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -20,7 +21,7 @@ export default function AIPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      text: "マルハン蒲田7の立ち回り支援AIです。\n抽選番号を引いた後に「○番引いた。今日のおすすめは？」のように聞いてください。\n\n店長ポスト（X）の内容があれば一緒に貼ると精度が上がります。",
+      text: "ナナです。マルハン蒲田7の立ち回りを担当します。\n抽選番号を引いた後に「○番引いた。今日のおすすめは？」と聞いてください。\n\n店長ポスト（X）の内容があれば一緒に貼ると精度が上がります。",
     },
   ]);
   const [input, setInput] = useState("");
@@ -103,7 +104,8 @@ export default function AIPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">AI社員</h1>
+        <h1 className="text-2xl font-bold text-gray-900">ナナ</h1>
+        <span className="text-sm text-gray-400">AI立ち回り支援</span>
         <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">
           Claude Sonnet 稼働中
         </span>
@@ -115,22 +117,49 @@ export default function AIPage() {
           {messages.map((m, i) => (
             <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed ${
+                className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
                   m.role === "user"
-                    ? "bg-[#1A3A5C] text-white rounded-br-none"
+                    ? "bg-[#1A3A5C] text-white rounded-br-none whitespace-pre-wrap leading-relaxed"
                     : "bg-gray-100 text-gray-800 rounded-bl-none"
                 }`}
               >
                 {m.role === "assistant" && (
-                  <div className="text-xs text-gray-400 mb-1.5 font-medium">AI社員</div>
+                  <div className="text-xs text-gray-400 mb-1.5 font-medium">ナナ</div>
                 )}
-                {m.text || (loading && i === messages.length - 1 ? (
+                {m.role === "user" ? (
+                  m.text
+                ) : m.text ? (
+                  <Markdown
+                    components={{
+                      h1: ({ children }) => <h1 className="text-base font-bold mt-3 mb-1 text-gray-900 border-b border-gray-300 pb-1">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-sm font-bold mt-3 mb-1 text-gray-800">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-sm font-semibold mt-2 mb-0.5 text-gray-700">{children}</h3>,
+                      p: ({ children }) => <p className="my-1 leading-relaxed">{children}</p>,
+                      strong: ({ children }) => <strong className="font-bold text-gray-900">{children}</strong>,
+                      ul: ({ children }) => <ul className="my-1 ml-4 list-disc space-y-0.5">{children}</ul>,
+                      ol: ({ children }) => <ol className="my-1 ml-4 list-decimal space-y-0.5">{children}</ol>,
+                      li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                      hr: () => <hr className="my-2 border-gray-300" />,
+                      table: ({ children }) => (
+                        <div className="overflow-x-auto my-2">
+                          <table className="text-xs border-collapse w-full">{children}</table>
+                        </div>
+                      ),
+                      thead: ({ children }) => <thead className="bg-gray-200">{children}</thead>,
+                      th: ({ children }) => <th className="border border-gray-300 px-2 py-1 text-left font-semibold">{children}</th>,
+                      td: ({ children }) => <td className="border border-gray-300 px-2 py-1">{children}</td>,
+                      code: ({ children }) => <code className="bg-gray-200 rounded px-1 font-mono text-xs">{children}</code>,
+                    }}
+                  >
+                    {m.text}
+                  </Markdown>
+                ) : loading && i === messages.length - 1 ? (
                   <span className="inline-flex gap-1 py-1">
                     <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                     <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                     <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                   </span>
-                ) : "")}
+                ) : null}
               </div>
             </div>
           ))}

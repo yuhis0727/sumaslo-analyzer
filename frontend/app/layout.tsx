@@ -12,7 +12,8 @@ const NAV = [
   { href: '/analytics/events',           label: 'イベント' },
   { href: '/analytics/layout-changes',  label: '配置変更' },
   { href: '/analytics/fixed-setting',   label: '固定設定6' },
-  { href: '/ai',                    label: 'AI社員' },
+  { href: '/analytics/new-machines',    label: '新台分析' },
+  { href: '/ai',                    label: 'ナナ' },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {

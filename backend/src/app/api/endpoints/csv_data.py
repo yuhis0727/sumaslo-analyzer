@@ -991,3 +991,97 @@ def get_fixed_setting(
         }
         for _, r in result.iterrows()
     ]
+
+
+# ── /api/data/new-machines ────────────────────────
+@router.get("/data/new-machines")
+def get_new_machines(intro_threshold_days: int = Query(30, ge=7)):
+    """
+    新台分析。データ開始日から intro_threshold_days 日以降に
+    初登場した機種を「新台」とみなし、導入週別の実績を返す。
+    """
+    df = _get_df()
+    first_date = df["date"].min()
+    latest_date = df["date"].max()
+
+    # 機種の初登場日
+    model_intro = (
+        df.groupby("model_name")["date"]
+        .min()
+        .reset_index()
+        .rename(columns={"date": "intro_date"})
+    )
+    cutoff = first_date + pd.Timedelta(days=intro_threshold_days)
+    new_models = model_intro[model_intro["intro_date"] >= cutoff].copy()
+
+    if new_models.empty:
+        return {"models": [], "weekly_aggregate": []}
+
+    # 日付ごとの店舗全体平均（比較用）
+    store_daily_avg = (
+        df.groupby("date")["total_diff"]
+        .mean()
+        .reset_index()
+        .rename(columns={"total_diff": "store_avg"})
+    )
+
+    models_out = []
+    # 週別集計用バッファ (week_num -> list of diffs)
+    week_bucket: dict[int, list[float]] = {}
+
+    for _, row in new_models.sort_values("intro_date", ascending=False).iterrows():
+        model_name = row["model_name"]
+        intro_date = row["intro_date"]
+        mdf = df[df["model_name"] == model_name].copy()
+        mdf["days_since"] = (mdf["date"] - intro_date).dt.days
+        mdf["week"] = (mdf["days_since"] // 7 + 1).clip(upper=8)  # 8週目以降を8+に丸める
+
+        # 店舗平均との比較（同日）
+        mdf = mdf.merge(store_daily_avg, on="date", how="left")
+        mdf["vs_store"] = mdf["total_diff"] - mdf["store_avg"]
+
+        # 週別集計
+        weekly_rows = []
+        for wk in sorted(mdf["week"].unique()):
+            sub = mdf[mdf["week"] == wk]
+            wr = float((sub["total_diff"] > 0).mean())
+            avg = float(sub["total_diff"].mean())
+            vs = float(sub["vs_store"].mean())
+            n = len(sub)
+            weekly_rows.append({
+                "week": int(wk),
+                "win_rate": round(wr, 4),
+                "avg_diff": int(avg),
+                "vs_store": int(vs),
+                "n": n,
+            })
+            bucket = week_bucket.setdefault(int(wk), [])
+            bucket.extend(sub["total_diff"].tolist())
+
+        total_days = int((latest_date - intro_date).days)
+        overall_wr = float((mdf["total_diff"] > 0).mean())
+        overall_avg = int(mdf["total_diff"].mean())
+
+        models_out.append({
+            "model_name": model_name,
+            "machine_type": _model_type(model_name),
+            "intro_date": intro_date.strftime("%Y-%m-%d"),
+            "total_days": total_days,
+            "n_data_days": len(mdf),
+            "overall_win_rate": round(overall_wr, 4),
+            "overall_avg_diff": overall_avg,
+            "weekly": weekly_rows,
+        })
+
+    # 全新台集計（週別）
+    weekly_agg = []
+    for wk in sorted(week_bucket.keys()):
+        diffs = week_bucket[wk]
+        weekly_agg.append({
+            "week": wk,
+            "avg_diff": int(sum(diffs) / len(diffs)),
+            "win_rate": round(sum(1 for d in diffs if d > 0) / len(diffs), 4),
+            "n": len(diffs),
+        })
+
+    return {"models": models_out, "weekly_aggregate": weekly_agg}
