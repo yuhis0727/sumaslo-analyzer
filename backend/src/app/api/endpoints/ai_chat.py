@@ -201,6 +201,15 @@ def _build_today_context() -> str:
     except Exception:
         pass
 
+    # ── 示唆情報（ウスイ店長X・ococoichi・LINE）──
+    try:
+        from .hints import get_today_hints_context
+        hints_ctx = get_today_hints_context()
+        if hints_ctx:
+            lines.append(f"\n=== 本日の示唆情報（最優先） ===\n{hints_ctx}")
+    except Exception:
+        pass
+
     return "\n".join(lines)
 
 
