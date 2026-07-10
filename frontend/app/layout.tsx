@@ -10,6 +10,7 @@ const NAV = [
   { href: '/',                      label: 'ダッシュボード' },
   { href: '/machines',              label: '台番分析' },
   { href: '/models',                label: '機種別' },
+  { href: '/analytics/allocation',        label: '高配分予測' },
   { href: '/analytics/zentai',           label: '全台系' },
   { href: '/analytics/events',           label: 'イベント' },
   { href: '/analytics/layout-changes',  label: '配置変更' },
