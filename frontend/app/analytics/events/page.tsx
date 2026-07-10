@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { RankBadge, WinBadge } from "../../components/Badges";
 import PageHeader from "../../components/PageHeader";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
 import { API } from "../../lib/api";
 import { diffStr, diffColor } from "../../lib/format";
 
@@ -161,107 +162,167 @@ export default function EventsPage() {
 
           {/* 日別実績 */}
           {tab === "dates" && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
-                  <tr>
-                    <th className="px-4 py-3 text-left">日付</th>
-                    <th className="px-4 py-3 text-left">曜日</th>
-                    <th className="px-4 py-3 text-right">台数</th>
-                    <th className="px-4 py-3 text-right">プラス率</th>
-                    <th className="px-4 py-3 text-right">平均差枚</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {analysis.dates_summary.map((d) => (
-                    <tr key={d.date} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-gray-700">{d.date}</td>
-                      <td className="px-4 py-3 text-gray-500">{d.day_of_week}曜</td>
-                      <td className="px-4 py-3 text-right text-gray-500">
-                        {d.plus_machines}/{d.total_machines}台
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <WinBadge rate={d.positive_rate} pill />
-                      </td>
-                      <td className={`px-4 py-3 text-right font-mono font-medium ${diffColor(d.avg_diff)}`}>
-                        {diffStr(d.avg_diff)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <ResponsiveTable
+                loading={false}
+                empty={analysis.dates_summary.length === 0}
+                mobile={analysis.dates_summary.map((d) => (
+                  <div key={d.date} className="px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-gray-700 text-sm">{d.date}</span>
+                        <span className="text-xs text-gray-500">{d.day_of_week}曜</span>
+                      </div>
+                      <WinBadge rate={d.positive_rate} pill />
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-1.5 text-xs text-gray-500">
+                      <span>{d.plus_machines}/{d.total_machines}台</span>
+                      <span className={`font-mono font-medium ${diffColor(d.avg_diff)}`}>{diffStr(d.avg_diff)}</span>
+                    </div>
+                  </div>
+                ))}
+                desktop={
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
+                      <tr>
+                        <th className="px-4 py-3 text-left">日付</th>
+                        <th className="px-4 py-3 text-left">曜日</th>
+                        <th className="px-4 py-3 text-right">台数</th>
+                        <th className="px-4 py-3 text-right">プラス率</th>
+                        <th className="px-4 py-3 text-right">平均差枚</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analysis.dates_summary.map((d) => (
+                        <tr key={d.date} className="border-t border-gray-100 hover:bg-gray-50">
+                          <td className="px-4 py-3 font-mono text-gray-700">{d.date}</td>
+                          <td className="px-4 py-3 text-gray-500">{d.day_of_week}曜</td>
+                          <td className="px-4 py-3 text-right text-gray-500">
+                            {d.plus_machines}/{d.total_machines}台
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <WinBadge rate={d.positive_rate} pill />
+                          </td>
+                          <td className={`px-4 py-3 text-right font-mono font-medium ${diffColor(d.avg_diff)}`}>
+                            {diffStr(d.avg_diff)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                }
+              />
             </div>
           )}
 
           {/* 機種別 */}
           {tab === "models" && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
-                  <tr>
-                    <th className="px-4 py-3 text-left">機種名</th>
-                    <th className="px-4 py-3 text-right">回数</th>
-                    <th className="px-4 py-3 text-right">勝率</th>
-                    <th className="px-4 py-3 text-right">平均差枚</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {analysis.top_models.map((m, i) => (
-                    <tr key={m.model_name} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <RankBadge rank={i + 1} />
-                          <span className="truncate max-w-[240px]">{m.model_name}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-500">{m.n_days}回</td>
-                      <td className="px-4 py-3 text-right">
-                        <WinBadge rate={m.win_rate} pill />
-                      </td>
-                      <td className={`px-4 py-3 text-right font-mono font-medium ${diffColor(m.avg_diff)}`}>
-                        {diffStr(m.avg_diff)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <ResponsiveTable
+                loading={false}
+                empty={analysis.top_models.length === 0}
+                mobile={analysis.top_models.map((m, i) => (
+                  <div key={m.model_name} className="px-4 py-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <RankBadge rank={i + 1} />
+                      <span className="truncate">{m.model_name}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-1.5">
+                      <WinBadge rate={m.win_rate} pill />
+                      <span className={`text-sm font-mono font-medium ${diffColor(m.avg_diff)}`}>{diffStr(m.avg_diff)}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">{m.n_days}回</div>
+                  </div>
+                ))}
+                desktop={
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
+                      <tr>
+                        <th className="px-4 py-3 text-left">機種名</th>
+                        <th className="px-4 py-3 text-right">回数</th>
+                        <th className="px-4 py-3 text-right">勝率</th>
+                        <th className="px-4 py-3 text-right">平均差枚</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analysis.top_models.map((m, i) => (
+                        <tr key={m.model_name} className="border-t border-gray-100 hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <RankBadge rank={i + 1} />
+                              <span className="truncate max-w-[240px]">{m.model_name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-500">{m.n_days}回</td>
+                          <td className="px-4 py-3 text-right">
+                            <WinBadge rate={m.win_rate} pill />
+                          </td>
+                          <td className={`px-4 py-3 text-right font-mono font-medium ${diffColor(m.avg_diff)}`}>
+                            {diffStr(m.avg_diff)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                }
+              />
             </div>
           )}
 
           {/* 台番別 */}
           {tab === "machines" && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
-                  <tr>
-                    <th className="px-4 py-3 text-left">台番</th>
-                    <th className="px-4 py-3 text-left">機種名</th>
-                    <th className="px-4 py-3 text-right">回数</th>
-                    <th className="px-4 py-3 text-right">勝率</th>
-                    <th className="px-4 py-3 text-right">平均差枚</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {analysis.top_machines.map((m, i) => (
-                    <tr key={m.machine_number} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <RankBadge rank={i + 1} />
-                          <span className="font-mono font-bold text-brand">{m.machine_number}番</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700 truncate max-w-[200px]">{m.model_name}</td>
-                      <td className="px-4 py-3 text-right text-gray-500">{m.n_days}回</td>
-                      <td className="px-4 py-3 text-right">
-                        <WinBadge rate={m.win_rate} pill />
-                      </td>
-                      <td className={`px-4 py-3 text-right font-mono font-medium ${diffColor(m.avg_diff)}`}>
-                        {diffStr(m.avg_diff)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <ResponsiveTable
+                loading={false}
+                empty={analysis.top_machines.length === 0}
+                mobile={analysis.top_machines.map((m, i) => (
+                  <div key={m.machine_number} className="px-4 py-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <RankBadge rank={i + 1} />
+                      <span className="font-mono font-bold text-brand shrink-0">{m.machine_number}番</span>
+                      <span className="text-gray-700 truncate">{m.model_name}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-1.5">
+                      <WinBadge rate={m.win_rate} pill />
+                      <span className={`text-sm font-mono font-medium ${diffColor(m.avg_diff)}`}>{diffStr(m.avg_diff)}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">{m.n_days}回</div>
+                  </div>
+                ))}
+                desktop={
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
+                      <tr>
+                        <th className="px-4 py-3 text-left">台番</th>
+                        <th className="px-4 py-3 text-left">機種名</th>
+                        <th className="px-4 py-3 text-right">回数</th>
+                        <th className="px-4 py-3 text-right">勝率</th>
+                        <th className="px-4 py-3 text-right">平均差枚</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analysis.top_machines.map((m, i) => (
+                        <tr key={m.machine_number} className="border-t border-gray-100 hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <RankBadge rank={i + 1} />
+                              <span className="font-mono font-bold text-brand">{m.machine_number}番</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 truncate max-w-[200px]">{m.model_name}</td>
+                          <td className="px-4 py-3 text-right text-gray-500">{m.n_days}回</td>
+                          <td className="px-4 py-3 text-right">
+                            <WinBadge rate={m.win_rate} pill />
+                          </td>
+                          <td className={`px-4 py-3 text-right font-mono font-medium ${diffColor(m.avg_diff)}`}>
+                            {diffStr(m.avg_diff)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                }
+              />
             </div>
           )}
         </>

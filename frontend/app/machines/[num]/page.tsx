@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ResponsiveLine } from "@nivo/line";
 import { EVENT_NAMES, EventName } from "../../components/EventOrNSelector";
 import { MachineType, TypeBadge, WinBadge } from "../../components/Badges";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
 import { API } from "../../lib/api";
 import { diffStr, diffColor } from "../../lib/format";
 
@@ -279,31 +280,54 @@ export default function MachineDetailPage() {
             <div className="p-4 border-b border-gray-100 font-semibold text-gray-700">
               日別履歴（{data.records.length}日）<span className="text-xs font-normal text-gray-400 ml-2">{modeLabel}</span>
             </div>
-            <div className="overflow-x-auto max-h-96 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600 text-xs sticky top-0">
-                  <tr>
-                    <th className="px-4 py-2 text-left">日付</th>
-                    <th className="px-4 py-2 text-left">曜</th>
-                    <th className="px-4 py-2 text-left">機種名</th>
-                    <th className="px-4 py-2 text-right">差枚</th>
-                    <th className="px-4 py-2 text-right">G数</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...data.records].reverse().map((r: DayRecord, i) => (
-                    <tr key={i} className={`border-t border-gray-50 hover:bg-gray-50 ${(r.total_diff ?? 0) >= 0 ? "bg-green-50/20" : ""}`}>
-                      <td className="px-4 py-2 font-mono text-gray-600">{r.date}</td>
-                      <td className="px-4 py-2 text-gray-400">{r.day_of_week}</td>
-                      <td className="px-4 py-2 text-gray-600 truncate max-w-[200px]">{r.model_name}</td>
-                      <td className={`px-4 py-2 text-right font-mono font-medium ${diffColor(r.total_diff ?? 0)}`}>
+            <div className="max-h-96 overflow-y-auto">
+              <ResponsiveTable
+                loading={false}
+                empty={data.records.length === 0}
+                mobile={[...data.records].reverse().map((r: DayRecord, i) => (
+                  <div key={i} className={`px-4 py-2.5 ${(r.total_diff ?? 0) >= 0 ? "bg-green-50/20" : ""}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-xs text-gray-600">{r.date}</span>
+                        <span className="text-xs text-gray-400">{r.day_of_week}</span>
+                      </div>
+                      <span className={`text-sm font-mono font-medium ${diffColor(r.total_diff ?? 0)}`}>
                         {r.total_diff != null ? diffStr(r.total_diff) : "—"}
-                      </td>
-                      <td className="px-4 py-2 text-right text-gray-400">{r.game_count?.toLocaleString() ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-1 text-xs text-gray-500">
+                      <span className="truncate">{r.model_name}</span>
+                      <span className="text-gray-400 shrink-0">{r.game_count?.toLocaleString() ?? "—"}G</span>
+                    </div>
+                  </div>
+                ))}
+                desktop={
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-600 text-xs sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2 text-left">日付</th>
+                        <th className="px-4 py-2 text-left">曜</th>
+                        <th className="px-4 py-2 text-left">機種名</th>
+                        <th className="px-4 py-2 text-right">差枚</th>
+                        <th className="px-4 py-2 text-right">G数</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...data.records].reverse().map((r: DayRecord, i) => (
+                        <tr key={i} className={`border-t border-gray-50 hover:bg-gray-50 ${(r.total_diff ?? 0) >= 0 ? "bg-green-50/20" : ""}`}>
+                          <td className="px-4 py-2 font-mono text-gray-600">{r.date}</td>
+                          <td className="px-4 py-2 text-gray-400">{r.day_of_week}</td>
+                          <td className="px-4 py-2 text-gray-600 truncate max-w-[200px]">{r.model_name}</td>
+                          <td className={`px-4 py-2 text-right font-mono font-medium ${diffColor(r.total_diff ?? 0)}`}>
+                            {r.total_diff != null ? diffStr(r.total_diff) : "—"}
+                          </td>
+                          <td className="px-4 py-2 text-right text-gray-400">{r.game_count?.toLocaleString() ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                }
+              />
             </div>
           </div>
         </>

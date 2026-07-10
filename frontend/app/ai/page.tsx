@@ -110,7 +110,7 @@ export default function AIPage() {
         </span>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[640px]">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[calc(100dvh-180px)] md:h-[640px]">
         {/* メッセージ一覧 */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {messages.map((m, i) => (

@@ -6,6 +6,7 @@ import Link from "next/link";
 import EventOrNSelector, { FilterMode, EventName } from "../components/EventOrNSelector";
 import TypeFilterTabs, { TypeFilter } from "../components/TypeFilterTabs";
 import { MachineType, WinBadge } from "../components/Badges";
+import { ResponsiveTable } from "../components/ResponsiveTable";
 import { API } from "../lib/api";
 import { diffStr, diffColor } from "../lib/format";
 
@@ -67,65 +68,95 @@ export default function MachinesPage() {
     mode === "plain" ? "平常日" : "全期間";
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-4">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-gray-900">台番分析</h1>
+        <span className="text-sm text-gray-400 shrink-0">{filtered.length}台</span>
+      </div>
 
-        <EventOrNSelector
-          mode={mode} n={n} event={event}
-          onModeChange={handleMode} onNChange={handleN} onEventChange={handleEvent}
-        />
+      <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <EventOrNSelector
+            mode={mode} n={n} event={event}
+            onModeChange={handleMode} onNChange={handleN} onEventChange={handleEvent}
+          />
+          <TypeFilterTabs value={typeFilter} onChange={setTypeFilter} />
+        </div>
 
-        <TypeFilterTabs value={typeFilter} onChange={setTypeFilter} />
-
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">最低日数:</span>
+        <div className="flex items-center gap-2 md:ml-auto">
           <select
             value={minDays}
             onChange={(e) => handleMinDays(Number(e.target.value))}
-            className="border border-gray-300 rounded px-2 py-1 text-sm"
+            className="border border-gray-300 rounded px-2 py-1.5 text-sm shrink-0"
           >
             {[3, 5, 8, 10].map((v) => (
               <option key={v} value={v}>{v}日以上</option>
             ))}
           </select>
+
+          <input
+            type="text"
+            placeholder="台番 or 機種名で絞り込み"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border border-gray-300 rounded px-3 py-1.5 text-sm flex-1 md:w-52"
+          />
         </div>
-
-        <input
-          type="text"
-          placeholder="台番 or 機種名で絞り込み"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="border border-gray-300 rounded px-3 py-1 text-sm w-52"
-        />
-
-        <span className="text-sm text-gray-400">{filtered.length}台</span>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-4 py-2 border-b border-gray-100 text-xs text-gray-400">
           {modeLabel} の台番別勝率
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-brand text-white text-xs">
-                <th className="px-3 py-3 text-left w-8">#</th>
-                <th className="px-3 py-3 text-left">台番</th>
-                <th className="px-3 py-3 text-left">機種名</th>
-                <th className="px-3 py-3 text-center">勝率</th>
-                <th className="px-3 py-3 text-right">平均差枚</th>
-                <th className="px-3 py-3 text-right">累計差枚</th>
-                <th className="px-3 py-3 text-center">実績</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading ? (
-                <tr><td colSpan={7} className="text-center py-12 text-gray-400">読み込み中...</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-12 text-gray-400">データなし</td></tr>
-              ) : (
-                filtered.map((m, i) => (
+
+        <ResponsiveTable
+          loading={loading}
+          empty={filtered.length === 0}
+          mobile={filtered.map((m, i) => (
+            <div
+              key={m.machine_number}
+              className={`px-4 py-3 ${
+                m.win_rate >= 0.8 ? "bg-green-50/60" :
+                m.win_rate >= 0.7 ? "bg-green-50/30" : ""
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-baseline gap-2 min-w-0">
+                  <span className="text-xs text-gray-400 shrink-0">{i + 1}</span>
+                  <Link href={`/machines/${m.machine_number}`} className="font-bold text-brand text-lg shrink-0 hover:underline">
+                    {m.machine_number}番
+                  </Link>
+                  <Link
+                    href={`/models/${encodeURIComponent(m.model_name)}`}
+                    className="text-sm text-gray-600 truncate hover:text-brand hover:underline"
+                  >
+                    {m.model_name}
+                  </Link>
+                </div>
+                <WinBadge rate={m.win_rate} />
+              </div>
+              <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                <span className={`text-sm font-medium ${diffColor(m.avg_diff)}`}>{diffStr(m.avg_diff)}枚</span>
+                <span>累計{diffStr(m.total_diff)}枚</span>
+                <span>{m.n_days}日</span>
+              </div>
+            </div>
+          ))}
+          desktop={
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-brand text-white text-xs">
+                  <th className="px-3 py-3 text-left w-8">#</th>
+                  <th className="px-3 py-3 text-left">台番</th>
+                  <th className="px-3 py-3 text-left">機種名</th>
+                  <th className="px-3 py-3 text-center">勝率</th>
+                  <th className="px-3 py-3 text-right">平均差枚</th>
+                  <th className="px-3 py-3 text-right">累計差枚</th>
+                  <th className="px-3 py-3 text-center">実績</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((m, i) => (
                   <tr
                     key={m.machine_number}
                     className={`hover:bg-blue-50/30 transition-colors ${
@@ -149,11 +180,11 @@ export default function MachinesPage() {
                     </td>
                     <td className="px-3 py-2.5 text-center text-gray-400 text-xs">{m.n_days}日</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          }
+        />
       </div>
     </div>
   );

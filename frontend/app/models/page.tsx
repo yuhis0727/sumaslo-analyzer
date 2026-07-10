@@ -6,6 +6,7 @@ import Link from "next/link";
 import EventOrNSelector, { FilterMode, EventName } from "../components/EventOrNSelector";
 import TypeFilterTabs, { TypeFilter } from "../components/TypeFilterTabs";
 import { MachineType, WinBar, TypeBadge } from "../components/Badges";
+import { ResponsiveTable } from "../components/ResponsiveTable";
 import { API } from "../lib/api";
 import { diffStr } from "../lib/format";
 
@@ -62,25 +63,55 @@ export default function ModelsPage() {
         <div className="px-5 py-3 border-b border-gray-100 text-sm text-gray-400">
           {modeLabel} の機種別勝率（機種全体の平均）
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-brand text-white text-xs">
-                <th className="px-4 py-3 text-left w-8">#</th>
-                <th className="px-4 py-3 text-left">機種名</th>
-                <th className="px-4 py-3 text-center">台数</th>
-                <th className="px-4 py-3 text-left">勝率</th>
-                <th className="px-4 py-3 text-right">平均差枚</th>
-                {recentMonths.map(ym => (
-                  <th key={ym} className="px-3 py-3 text-right whitespace-nowrap">{ym.slice(5)}月平均</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading ? (
-                <tr><td colSpan={5 + recentMonths.length} className="text-center py-12 text-gray-400">読み込み中...</td></tr>
-              ) : (
-                filtered.map((m, i) => (
+        <ResponsiveTable
+          loading={loading}
+          empty={filtered.length === 0}
+          mobile={filtered.map((m, i) => (
+            <div key={m.model_name} className={`px-4 py-3 ${m.win_rate >= 0.65 ? "bg-green-50/40" : ""}`}>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs text-gray-400 shrink-0">{i + 1}</span>
+                <TypeBadge type={m.machine_type} short />
+                <Link href={`/models/${encodeURIComponent(m.model_name)}`} className="font-medium text-gray-800 truncate hover:text-brand hover:underline">
+                  {m.model_name}
+                </Link>
+              </div>
+              <div className="flex items-center justify-between gap-2 mt-1.5">
+                <WinBar rate={m.win_rate} />
+                <span className={`text-sm font-medium shrink-0 ${m.avg_diff >= 0 ? "text-green-700" : "text-red-500"}`}>
+                  {diffStr(m.avg_diff)}枚
+                </span>
+              </div>
+              {recentMonths.length > 0 && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-400">
+                  <span>{m.n_machines}台</span>
+                  {recentMonths.map(ym => {
+                    const v = m.monthly_avg?.[ym];
+                    return (
+                      <span key={ym} className={v == null ? "" : v >= 0 ? "text-green-600" : "text-red-400"}>
+                        {ym.slice(5)}月{v == null ? "—" : diffStr(v)}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+          desktop={
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-brand text-white text-xs">
+                  <th className="px-4 py-3 text-left w-8">#</th>
+                  <th className="px-4 py-3 text-left">機種名</th>
+                  <th className="px-4 py-3 text-center">台数</th>
+                  <th className="px-4 py-3 text-left">勝率</th>
+                  <th className="px-4 py-3 text-right">平均差枚</th>
+                  {recentMonths.map(ym => (
+                    <th key={ym} className="px-3 py-3 text-right whitespace-nowrap">{ym.slice(5)}月平均</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((m, i) => (
                   <tr key={m.model_name} className={`hover:bg-gray-50 ${m.win_rate >= 0.65 ? "bg-green-50/40" : ""}`}>
                     <td className="px-4 py-2.5 text-gray-400 text-xs">{i + 1}</td>
                     <td className="px-4 py-2.5">
@@ -107,11 +138,11 @@ export default function ModelsPage() {
                       );
                     })}
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          }
+        />
       </div>
     </div>
   );

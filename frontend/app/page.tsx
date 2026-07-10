@@ -6,6 +6,7 @@ import { API } from "./lib/api";
 import { diffStr } from "./lib/format";
 import { WinBadge, DiffText, DowBadge } from "./components/Badges";
 import { LoadingState, ErrorAlert } from "./components/StateViews";
+import { ResponsiveTable } from "./components/ResponsiveTable";
 
 type MachinePick = {
   machine_number: number;
@@ -112,42 +113,62 @@ export default function Dashboard() {
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">現稼働台限定・最低8日実績</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-500 text-xs">
-                    <th className="px-3 py-2 text-left w-8">#</th>
-                    <th className="px-3 py-2 text-left">台番</th>
-                    <th className="px-3 py-2 text-left">機種</th>
-                    <th className="px-3 py-2 text-center">勝率</th>
-                    <th className="px-3 py-2 text-right">平均差枚</th>
-                    <th className="px-3 py-2 text-center">実績日数</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {summary.top_machines.slice(0, 10).map((m, i) => (
-                    <tr key={m.machine_number} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-3 py-2.5 text-gray-400 text-xs">{i + 1}</td>
-                      <td className="px-3 py-2.5 font-bold text-brand">
-                        {m.machine_number}番
-                      </td>
-                      <td className="px-3 py-2.5 text-gray-700 max-w-[200px] truncate">
-                        {m.model_name}
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
-                        <WinBadge rate={m.win_rate} />
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <DiffText value={m.avg_diff} unit="枚" />
-                      </td>
-                      <td className="px-3 py-2.5 text-center text-gray-400 text-xs">
-                        {m.n_days}日
-                      </td>
+            <ResponsiveTable
+              loading={false}
+              empty={summary.top_machines.length === 0}
+              mobile={summary.top_machines.slice(0, 10).map((m, i) => (
+                <div key={m.machine_number} className="px-4 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-baseline gap-2 min-w-0">
+                      <span className="text-xs text-gray-400 shrink-0">{i + 1}</span>
+                      <span className="font-bold text-brand text-lg shrink-0">{m.machine_number}番</span>
+                      <span className="text-sm text-gray-600 truncate">{m.model_name}</span>
+                    </div>
+                    <WinBadge rate={m.win_rate} />
+                  </div>
+                  <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                    <span className="text-sm font-medium"><DiffText value={m.avg_diff} unit="枚" /></span>
+                    <span>{m.n_days}日</span>
+                  </div>
+                </div>
+              ))}
+              desktop={
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-500 text-xs">
+                      <th className="px-3 py-2 text-left w-8">#</th>
+                      <th className="px-3 py-2 text-left">台番</th>
+                      <th className="px-3 py-2 text-left">機種</th>
+                      <th className="px-3 py-2 text-center">勝率</th>
+                      <th className="px-3 py-2 text-right">平均差枚</th>
+                      <th className="px-3 py-2 text-center">実績日数</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {summary.top_machines.slice(0, 10).map((m, i) => (
+                      <tr key={m.machine_number} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-3 py-2.5 text-gray-400 text-xs">{i + 1}</td>
+                        <td className="px-3 py-2.5 font-bold text-brand">
+                          {m.machine_number}番
+                        </td>
+                        <td className="px-3 py-2.5 text-gray-700 max-w-[200px] truncate">
+                          {m.model_name}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <WinBadge rate={m.win_rate} />
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          <DiffText value={m.avg_diff} unit="枚" />
+                        </td>
+                        <td className="px-3 py-2.5 text-center text-gray-400 text-xs">
+                          {m.n_days}日
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              }
+            />
           </div>
         )}
 
@@ -181,43 +202,65 @@ export default function Dashboard() {
         <div className="px-5 py-4 border-b border-gray-100">
           <h2 className="font-bold text-gray-900">📅 直近7日の全台成績</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-gray-500 text-xs">
-                <th className="px-4 py-2 text-left">日付</th>
-                <th className="px-4 py-2 text-center">曜日</th>
-                <th className="px-4 py-2 text-center">稼働台数</th>
-                <th className="px-4 py-2 text-center">勝ち台数</th>
-                <th className="px-4 py-2 text-center">全台勝率</th>
-                <th className="px-4 py-2 text-right">平均差枚</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {recent.map((r) => {
-                const d = new Date(r.date);
-                return (
-                  <tr key={r.date} className={`hover:bg-gray-50 ${isEventDay(d.getDate()) ? "bg-blue-50/40" : ""}`}>
-                    <td className="px-4 py-2.5 font-medium text-gray-900">
-                      {`${d.getMonth() + 1}/${d.getDate()}`}
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <DowBadge dow={r.day_of_week} />
-                    </td>
-                    <td className="px-4 py-2.5 text-center text-gray-600">{r.total_machines}</td>
-                    <td className="px-4 py-2.5 text-center text-gray-600">{r.win_machines}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <WinBadge rate={r.win_rate} />
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <DiffText value={r.avg_diff} unit="枚" />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <ResponsiveTable
+          loading={false}
+          empty={recent.length === 0}
+          mobile={recent.map((r) => {
+            const d = new Date(r.date);
+            return (
+              <div key={r.date} className={`px-4 py-3 ${isEventDay(d.getDate()) ? "bg-blue-50/40" : ""}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">{`${d.getMonth() + 1}/${d.getDate()}`}</span>
+                    <DowBadge dow={r.day_of_week} />
+                  </div>
+                  <WinBadge rate={r.win_rate} />
+                </div>
+                <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                  <span className="text-sm font-medium"><DiffText value={r.avg_diff} unit="枚" /></span>
+                  <span>{r.win_machines}/{r.total_machines}台</span>
+                </div>
+              </div>
+            );
+          })}
+          desktop={
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-gray-500 text-xs">
+                  <th className="px-4 py-2 text-left">日付</th>
+                  <th className="px-4 py-2 text-center">曜日</th>
+                  <th className="px-4 py-2 text-center">稼働台数</th>
+                  <th className="px-4 py-2 text-center">勝ち台数</th>
+                  <th className="px-4 py-2 text-center">全台勝率</th>
+                  <th className="px-4 py-2 text-right">平均差枚</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {recent.map((r) => {
+                  const d = new Date(r.date);
+                  return (
+                    <tr key={r.date} className={`hover:bg-gray-50 ${isEventDay(d.getDate()) ? "bg-blue-50/40" : ""}`}>
+                      <td className="px-4 py-2.5 font-medium text-gray-900">
+                        {`${d.getMonth() + 1}/${d.getDate()}`}
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        <DowBadge dow={r.day_of_week} />
+                      </td>
+                      <td className="px-4 py-2.5 text-center text-gray-600">{r.total_machines}</td>
+                      <td className="px-4 py-2.5 text-center text-gray-600">{r.win_machines}</td>
+                      <td className="px-4 py-2.5 text-center">
+                        <WinBadge rate={r.win_rate} />
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <DiffText value={r.avg_diff} unit="枚" />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          }
+        />
       </div>
     </div>
   );

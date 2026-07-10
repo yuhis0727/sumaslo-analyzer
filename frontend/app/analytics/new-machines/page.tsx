@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -133,49 +134,77 @@ export default function NewMachinesPage() {
           <div className="px-5 py-3 border-b border-gray-100 font-medium text-gray-700 text-sm">
             全新台 導入週別集計
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-xs text-gray-500">
-                  <th className="px-4 py-2 text-left">導入週</th>
-                  <th className="px-4 py-2 text-right">平均差枚</th>
-                  <th className="px-4 py-2 text-right">勝率</th>
-                  <th className="px-4 py-2 text-right">サンプル数</th>
-                  <th className="px-4 py-2 text-left">回収度</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {agg.map(w => {
-                  const barW = Math.min(100, Math.abs(w.avg_diff) / 20);
-                  return (
-                    <tr key={w.week} className={w.week <= 2 ? "bg-amber-50/40" : ""}>
-                      <td className="px-4 py-2.5 font-medium text-gray-700">
-                        {w.week === 8 ? "8週目〜" : `${w.week}週目`}
-                        {w.week <= 2 && <span className="ml-2 text-xs text-amber-600 font-normal">回収期?</span>}
-                      </td>
-                      <td className="px-4 py-2.5 text-right font-mono">
-                        <DiffCell value={w.avg_diff} />
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <WrCell value={w.win_rate} />
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-gray-400 text-xs">{w.n}台日</td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-1">
-                          <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-2 rounded-full ${w.avg_diff >= 0 ? "bg-green-400" : "bg-red-400"}`}
-                              style={{ width: `${barW}%` }}
-                            />
+          <ResponsiveTable
+            loading={false}
+            empty={agg.length === 0}
+            mobile={agg.map(w => {
+              const barW = Math.min(100, Math.abs(w.avg_diff) / 20);
+              return (
+                <div key={w.week} className={`px-4 py-2.5 ${w.week <= 2 ? "bg-amber-50/40" : ""}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-gray-700 text-sm">
+                      {w.week === 8 ? "8週目〜" : `${w.week}週目`}
+                      {w.week <= 2 && <span className="ml-2 text-xs text-amber-600 font-normal">回収期?</span>}
+                    </span>
+                    <span className="font-mono text-sm"><DiffCell value={w.avg_diff} /></span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-1 text-xs text-gray-400">
+                    <WrCell value={w.win_rate} />
+                    <span>{w.n}台日</span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mt-1.5">
+                    <div
+                      className={`h-2 rounded-full ${w.avg_diff >= 0 ? "bg-green-400" : "bg-red-400"}`}
+                      style={{ width: `${barW}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+            desktop={
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-xs text-gray-500">
+                    <th className="px-4 py-2 text-left">導入週</th>
+                    <th className="px-4 py-2 text-right">平均差枚</th>
+                    <th className="px-4 py-2 text-right">勝率</th>
+                    <th className="px-4 py-2 text-right">サンプル数</th>
+                    <th className="px-4 py-2 text-left">回収度</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {agg.map(w => {
+                    const barW = Math.min(100, Math.abs(w.avg_diff) / 20);
+                    return (
+                      <tr key={w.week} className={w.week <= 2 ? "bg-amber-50/40" : ""}>
+                        <td className="px-4 py-2.5 font-medium text-gray-700">
+                          {w.week === 8 ? "8週目〜" : `${w.week}週目`}
+                          {w.week <= 2 && <span className="ml-2 text-xs text-amber-600 font-normal">回収期?</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-mono">
+                          <DiffCell value={w.avg_diff} />
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <WrCell value={w.win_rate} />
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-gray-400 text-xs">{w.n}台日</td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-1">
+                            <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-2 rounded-full ${w.avg_diff >= 0 ? "bg-green-400" : "bg-red-400"}`}
+                                style={{ width: `${barW}%` }}
+                              />
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            }
+          />
         </div>
       )}
 
@@ -202,55 +231,96 @@ export default function NewMachinesPage() {
             ))}
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#1A3A5C] text-white text-xs">
-                <th className="px-4 py-3 text-left">機種名</th>
-                <th className="px-4 py-3 text-center whitespace-nowrap">導入日</th>
-                <th className="px-4 py-3 text-center whitespace-nowrap">経過日</th>
-                <th className="px-4 py-3 text-center whitespace-nowrap">全体勝率</th>
-                <th className="px-4 py-3 text-center whitespace-nowrap">全体平均差枚</th>
-                {WEEKS.map(w => (
-                  <th key={w} className="px-3 py-3 text-center whitespace-nowrap">
-                    {w === 8 ? "8w〜" : `${w}w`}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {models.map(m => {
-                const weekMap = Object.fromEntries(m.weekly.map(w => [w.week, w]));
-                return (
-                  <tr key={m.model_name} className="hover:bg-gray-50">
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded shrink-0 ${TYPE_COLOR[m.machine_type]}`}>
-                          {TYPE_LABEL[m.machine_type]}
-                        </span>
-                        <span className="font-medium text-gray-800 text-xs">{m.model_name}</span>
+        <ResponsiveTable
+          loading={false}
+          empty={models.length === 0}
+          emptyLabel="該当機種なし"
+          mobile={models.map(m => {
+            const weekMap = Object.fromEntries(m.weekly.map(w => [w.week, w]));
+            return (
+              <div key={m.model_name} className="px-4 py-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded shrink-0 ${TYPE_COLOR[m.machine_type]}`}>
+                    {TYPE_LABEL[m.machine_type]}
+                  </span>
+                  <span className="font-medium text-gray-800 text-sm truncate">{m.model_name}</span>
+                </div>
+                <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                  <span className="whitespace-nowrap">{m.intro_date}</span>
+                  <span>
+                    {m.total_days <= 28
+                      ? <span className="text-amber-600 font-medium">{m.total_days}日</span>
+                      : `${m.total_days}日`}
+                  </span>
+                  <WrCell value={m.overall_win_rate} />
+                  <span className="font-mono"><DiffCell value={m.overall_avg_diff} /></span>
+                </div>
+                <div className="flex gap-1.5 mt-2 overflow-x-auto pb-0.5">
+                  {WEEKS.map(w => {
+                    const wd = weekMap[w];
+                    if (!wd) return null;
+                    const bg =
+                      wd.avg_diff >= 200 ? "bg-green-100" :
+                      wd.avg_diff >= 0 ? "bg-yellow-50" :
+                      "bg-red-50";
+                    return (
+                      <div key={w} className={`shrink-0 rounded px-2 py-1 text-center text-[10px] ${bg}`}>
+                        <div className="text-gray-400">{w === 8 ? "8w〜" : `${w}w`}</div>
+                        <div className="font-mono font-medium"><DiffCell value={wd.avg_diff} /></div>
                       </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-center text-xs text-gray-500 whitespace-nowrap">{m.intro_date}</td>
-                    <td className="px-4 py-2.5 text-center text-xs text-gray-500">
-                      {m.total_days <= 28
-                        ? <span className="text-amber-600 font-medium">{m.total_days}日</span>
-                        : `${m.total_days}日`}
-                    </td>
-                    <td className="px-4 py-2.5 text-center"><WrCell value={m.overall_win_rate} /></td>
-                    <td className="px-4 py-2.5 text-center font-mono text-xs"><DiffCell value={m.overall_avg_diff} /></td>
-                    {WEEKS.map(w => (
-                      <WeekBadge key={w} wk={w} data={weekMap[w]} />
-                    ))}
-                  </tr>
-                );
-              })}
-              {models.length === 0 && (
-                <tr><td colSpan={5 + WEEKS.length} className="text-center py-8 text-gray-400">該当機種なし</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          desktop={
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[#1A3A5C] text-white text-xs">
+                  <th className="px-4 py-3 text-left">機種名</th>
+                  <th className="px-4 py-3 text-center whitespace-nowrap">導入日</th>
+                  <th className="px-4 py-3 text-center whitespace-nowrap">経過日</th>
+                  <th className="px-4 py-3 text-center whitespace-nowrap">全体勝率</th>
+                  <th className="px-4 py-3 text-center whitespace-nowrap">全体平均差枚</th>
+                  {WEEKS.map(w => (
+                    <th key={w} className="px-3 py-3 text-center whitespace-nowrap">
+                      {w === 8 ? "8w〜" : `${w}w`}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {models.map(m => {
+                  const weekMap = Object.fromEntries(m.weekly.map(w => [w.week, w]));
+                  return (
+                    <tr key={m.model_name} className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-bold px-1.5 py-0.5 rounded shrink-0 ${TYPE_COLOR[m.machine_type]}`}>
+                            {TYPE_LABEL[m.machine_type]}
+                          </span>
+                          <span className="font-medium text-gray-800 text-xs">{m.model_name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-center text-xs text-gray-500 whitespace-nowrap">{m.intro_date}</td>
+                      <td className="px-4 py-2.5 text-center text-xs text-gray-500">
+                        {m.total_days <= 28
+                          ? <span className="text-amber-600 font-medium">{m.total_days}日</span>
+                          : `${m.total_days}日`}
+                      </td>
+                      <td className="px-4 py-2.5 text-center"><WrCell value={m.overall_win_rate} /></td>
+                      <td className="px-4 py-2.5 text-center font-mono text-xs"><DiffCell value={m.overall_avg_diff} /></td>
+                      {WEEKS.map(w => (
+                        <WeekBadge key={w} wk={w} data={weekMap[w]} />
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          }
+        />
         <div className="px-5 py-2 text-xs text-gray-400 border-t border-gray-100">
           各セル: 上段=平均差枚 / 下段=勝率。黄色ハイライト行=導入28日以内の現役新台
         </div>
