@@ -4,28 +4,21 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import axios from "axios";
 import Link from "next/link";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { MachineType, TypeBadge, WinBadge } from "../../components/Badges";
+import { API } from "../../lib/api";
+import { diffStr, diffColor } from "../../lib/format";
 
 type Monthly = { month: string; avg_diff: number; win_rate: number };
 type MachineStat = { machine_number: number; n_days: number; win_rate: number; avg_diff: number; total_diff: number };
 
 type Detail = {
   model_name: string;
-  machine_type: string;
+  machine_type: MachineType;
   machine_count: number;
   overall: { win_rate: number; avg_diff: number; total_diff: number };
   monthly: Monthly[];
   machines: MachineStat[];
 };
-
-function diffColor(v: number) { return v >= 0 ? "text-green-600" : "text-red-500"; }
-function diffStr(v: number) { return `${v >= 0 ? "+" : ""}${v.toLocaleString()}`; }
-function winBadge(r: number) {
-  const pct = Math.round(r * 100);
-  const cls = pct >= 80 ? "bg-green-600 text-white" : pct >= 65 ? "bg-green-400 text-white" : pct >= 50 ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-500";
-  return <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${cls}`}>{pct}%</span>;
-}
 
 export default function ModelDetailPage() {
   const { name } = useParams<{ name: string }>();
@@ -52,11 +45,7 @@ export default function ModelDetailPage() {
         <div>
           <div className="flex items-center gap-3">
             <div className="text-2xl font-bold text-gray-900">{data.model_name}</div>
-            <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-              data.machine_type === "A" ? "bg-green-100 text-green-700" :
-              data.machine_type === "BT" ? "bg-purple-100 text-purple-700" :
-              "bg-blue-100 text-blue-700"
-            }`}>{data.machine_type === "A" ? "Aタイプ" : data.machine_type + "機"}</span>
+            <TypeBadge type={data.machine_type} />
           </div>
           <div className="text-sm text-gray-500 mt-0.5">{data.machine_count}台設置</div>
         </div>
@@ -65,7 +54,7 @@ export default function ModelDetailPage() {
       {/* サマリーカード */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
-          { label: "全体勝率", value: winBadge(data.overall.win_rate) },
+          { label: "全体勝率", value: <WinBadge rate={data.overall.win_rate} /> },
           { label: "全体平均差枚", value: <span className={`text-xl font-bold ${diffColor(data.overall.avg_diff)}`}>{diffStr(data.overall.avg_diff)}</span> },
           { label: "全台累計差枚", value: <span className={`text-xl font-bold ${diffColor(data.overall.total_diff)}`}>{diffStr(data.overall.total_diff)}</span> },
         ].map(c => (
@@ -122,11 +111,11 @@ export default function ModelDetailPage() {
                   <tr key={m.machine_number} className="hover:bg-gray-50">
                     <td className="py-1.5 text-gray-400 text-xs">{i + 1}</td>
                     <td className="py-1.5">
-                      <Link href={`/machines/${m.machine_number}`} className="font-mono font-bold text-[#1A3A5C] hover:underline">
+                      <Link href={`/machines/${m.machine_number}`} className="font-mono font-bold text-brand hover:underline">
                         {m.machine_number}番
                       </Link>
                     </td>
-                    <td className="py-1.5 text-right">{winBadge(m.win_rate)}</td>
+                    <td className="py-1.5 text-right"><WinBadge rate={m.win_rate} /></td>
                     <td className={`py-1.5 text-right font-mono font-medium ${diffColor(m.avg_diff)}`}>{diffStr(m.avg_diff)}</td>
                   </tr>
                 ))}

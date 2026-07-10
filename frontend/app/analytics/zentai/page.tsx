@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import EventOrNSelector, { FilterMode, EventName } from "../../components/EventOrNSelector";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { RankBadge } from "../../components/Badges";
+import PageHeader from "../../components/PageHeader";
+import { API } from "../../lib/api";
+import { diffStr, diffColor } from "../../lib/format";
 
 type ModelScore = {
   model_name: string;
@@ -90,12 +92,10 @@ export default function ZentaiPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">全台系パターン検知</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          機種内プラス台65%以上の日を全台系と判定し、頻度と期待値をスコア化します
-        </p>
-      </div>
+      <PageHeader
+        title="全台系パターン検知"
+        description="機種内プラス台65%以上の日を全台系と判定し、頻度と期待値をスコア化します"
+      />
 
       <EventOrNSelector
         mode={mode} n={n} event={event}
@@ -110,7 +110,7 @@ export default function ZentaiPage() {
             onClick={() => setTab(t)}
             className={`px-5 py-2 text-sm font-medium border-b-2 transition-colors ${
               tab === t
-                ? "border-[#1A3A5C] text-[#1A3A5C]"
+                ? "border-brand text-brand"
                 : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -151,13 +151,7 @@ export default function ZentaiPage() {
                   <tr key={row.model_name} className="border-t border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        {i < 3 && (
-                          <span className={`text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-                            i === 0 ? "bg-yellow-400 text-white" :
-                            i === 1 ? "bg-gray-300 text-gray-700" :
-                            "bg-amber-600 text-white"
-                          }`}>{i + 1}</span>
-                        )}
+                        <RankBadge rank={i + 1} />
                         <span className="font-medium text-gray-800 truncate max-w-[220px]">{row.model_name}</span>
                       </div>
                     </td>
@@ -172,10 +166,8 @@ export default function ZentaiPage() {
                         <span className="ml-1 font-normal opacity-70">({row.zentai_count}/{row.total_event_days})</span>
                       </span>
                     </td>
-                    <td className={`px-4 py-3 text-right font-mono font-medium ${
-                      row.avg_zentai_diff >= 0 ? "text-green-600" : "text-red-500"
-                    }`}>
-                      {row.avg_zentai_diff >= 0 ? "+" : ""}{row.avg_zentai_diff.toLocaleString()}
+                    <td className={`px-4 py-3 text-right font-mono font-medium ${diffColor(row.avg_zentai_diff)}`}>
+                      {diffStr(row.avg_zentai_diff)}
                     </td>
                     <td className="px-4 py-3 text-right">{recentBadge(row.recent_zentai_3)}</td>
                     <td className="px-4 py-3">{scoreBar(row.score, maxScore)}</td>
@@ -212,7 +204,7 @@ export default function ZentaiPage() {
                   <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 font-mono text-gray-600">{row.date}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className="inline-block w-7 h-7 rounded-full bg-[#1A3A5C] text-white text-xs font-bold flex items-center justify-center">
+                      <span className="inline-block w-7 h-7 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center">
                         {row.event_n}
                       </span>
                     </td>
@@ -228,10 +220,8 @@ export default function ZentaiPage() {
                         {(row.positive_rate * 100).toFixed(0)}%
                       </span>
                     </td>
-                    <td className={`px-4 py-3 text-right font-mono font-medium ${
-                      row.avg_diff >= 0 ? "text-green-600" : "text-red-500"
-                    }`}>
-                      {row.avg_diff >= 0 ? "+" : ""}{row.avg_diff.toLocaleString()}
+                    <td className={`px-4 py-3 text-right font-mono font-medium ${diffColor(row.avg_diff)}`}>
+                      {diffStr(row.avg_diff)}
                     </td>
                   </tr>
                 ))}

@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import EventOrNSelector, { FilterMode, EventName } from "../../components/EventOrNSelector";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { MachineType, TypeBadge } from "../../components/Badges";
+import PageHeader from "../../components/PageHeader";
+import { API } from "../../lib/api";
 
 type ModelRow = {
   model_name: string;
-  machine_type: "AT" | "A" | "BT";
+  machine_type: MachineType;
   current_count: number;
   scale: "small" | "medium" | "large";
   n_days: number;
@@ -30,12 +31,6 @@ const PATTERN_STYLE: Record<string, string> = {
   "1/2集中寄り":  "bg-blue-100 text-blue-800 border-blue-300",
   "一部高設定":   "bg-yellow-100 text-yellow-800 border-yellow-300",
   "回収傾向":     "bg-gray-100 text-gray-500 border-gray-300",
-};
-
-const TYPE_STYLE: Record<string, string> = {
-  AT: "bg-blue-50 text-blue-700",
-  A:  "bg-green-50 text-green-700",
-  BT: "bg-purple-50 text-purple-700",
 };
 
 function RatioBar({ ratio }: { ratio: number }) {
@@ -78,9 +73,7 @@ function Section({ title, badge, badgeColor, rows, emptyText }: {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="font-bold text-sm text-gray-800 truncate">{r.model_name}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${TYPE_STYLE[r.machine_type]}`}>
-                    {r.machine_type === "A" ? "Aタイプ" : r.machine_type + "機"}
-                  </span>
+                  <TypeBadge type={r.machine_type} />
                   <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${PATTERN_STYLE[r.pattern]}`}>
                     {r.pattern}
                   </span>
@@ -140,10 +133,10 @@ export default function AllocationPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">台数規模別 高配分予測</h1>
-          <p className="text-xs text-gray-400 mt-0.5">機種ごとに「この日種で何割の台がプラスになるか」の傾向を出す</p>
-        </div>
+        <PageHeader
+          title="台数規模別 高配分予測"
+          description="機種ごとに「この日種で何割の台がプラスになるか」の傾向を出す"
+        />
         <EventOrNSelector
           mode={mode} n={n} event={event}
           onModeChange={handleMode} onNChange={handleN} onEventChange={handleEvent}

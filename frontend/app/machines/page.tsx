@@ -4,11 +4,10 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import Link from "next/link";
 import EventOrNSelector, { FilterMode, EventName } from "../components/EventOrNSelector";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
-type MachineType = "AT" | "A" | "BT";
-type TypeFilter = "all" | MachineType;
+import TypeFilterTabs, { TypeFilter } from "../components/TypeFilterTabs";
+import { MachineType, WinBadge } from "../components/Badges";
+import { API } from "../lib/api";
+import { diffStr, diffColor } from "../lib/format";
 
 type Machine = {
   machine_number: number;
@@ -19,21 +18,6 @@ type Machine = {
   total_diff: number;
   n_days: number;
 };
-
-function WinBadge({ rate }: { rate: number }) {
-  const pct = Math.round(rate * 100);
-  const color =
-    pct >= 80 ? "bg-green-600 text-white" :
-    pct >= 70 ? "bg-green-400 text-white" :
-    pct >= 60 ? "bg-green-200 text-green-900" :
-    pct >= 50 ? "bg-yellow-100 text-yellow-800" :
-    "bg-gray-100 text-gray-500";
-  return (
-    <span className={`inline-block px-2 py-0.5 rounded text-sm font-bold ${color}`}>
-      {pct}%
-    </span>
-  );
-}
 
 export default function MachinesPage() {
   const [mode, setMode] = useState<FilterMode>("n");
@@ -92,24 +76,7 @@ export default function MachinesPage() {
           onModeChange={handleMode} onNChange={handleN} onEventChange={handleEvent}
         />
 
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-          {(["all", "AT", "A", "BT"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTypeFilter(t)}
-              className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
-                typeFilter === t
-                  ? t === "A" ? "bg-green-600 text-white"
-                  : t === "BT" ? "bg-purple-600 text-white"
-                  : t === "AT" ? "bg-blue-600 text-white"
-                  : "bg-white text-gray-700 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {t === "all" ? "全台" : t === "A" ? "Aタイプ" : t + "機"}
-            </button>
-          ))}
-        </div>
+        <TypeFilterTabs value={typeFilter} onChange={setTypeFilter} />
 
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">最低日数:</span>
@@ -142,7 +109,7 @@ export default function MachinesPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#1A3A5C] text-white text-xs">
+              <tr className="bg-brand text-white text-xs">
                 <th className="px-3 py-3 text-left w-8">#</th>
                 <th className="px-3 py-3 text-left">台番</th>
                 <th className="px-3 py-3 text-left">機種名</th>
@@ -167,20 +134,18 @@ export default function MachinesPage() {
                     }`}
                   >
                     <td className="px-3 py-2.5 text-gray-400 text-xs">{i + 1}</td>
-                    <td className="px-3 py-2.5 font-bold text-[#1A3A5C] text-base">
+                    <td className="px-3 py-2.5 font-bold text-brand text-base">
                       <Link href={`/machines/${m.machine_number}`} className="hover:underline">{m.machine_number}番</Link>
                     </td>
                     <td className="px-3 py-2.5 text-gray-700 max-w-[220px] truncate">
-                      <Link href={`/models/${encodeURIComponent(m.model_name)}`} className="hover:underline hover:text-[#1A3A5C]">{m.model_name}</Link>
+                      <Link href={`/models/${encodeURIComponent(m.model_name)}`} className="hover:underline hover:text-brand">{m.model_name}</Link>
                     </td>
                     <td className="px-3 py-2.5 text-center"><WinBadge rate={m.win_rate} /></td>
                     <td className="px-3 py-2.5 text-right font-medium">
-                      <span className={m.avg_diff >= 0 ? "text-green-700" : "text-red-500"}>
-                        {m.avg_diff >= 0 ? "+" : ""}{m.avg_diff.toLocaleString()}枚
-                      </span>
+                      <span className={diffColor(m.avg_diff)}>{diffStr(m.avg_diff)}枚</span>
                     </td>
                     <td className="px-3 py-2.5 text-right text-gray-500 text-xs">
-                      {m.total_diff >= 0 ? "+" : ""}{m.total_diff.toLocaleString()}枚
+                      {diffStr(m.total_diff)}枚
                     </td>
                     <td className="px-3 py-2.5 text-center text-gray-400 text-xs">{m.n_days}日</td>
                   </tr>

@@ -2,14 +2,16 @@
 
 import { useState } from "react";
 import axios from "axios";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { API } from "../lib/api";
+import { diffStr } from "../lib/format";
+import { MachineType, TypeBadge } from "../components/Badges";
+import PageHeader from "../components/PageHeader";
 
 type Rec = {
   priority: number;
   machine_number: number;
   model_name: string;
-  machine_type: "AT" | "A" | "BT";
+  machine_type: MachineType;
   win_rate: number;
   avg_diff: number;
   n_days: number;
@@ -42,12 +44,6 @@ const TIER_STYLE = {
   悪番: { bg: "bg-red-500", text: "text-red-700", light: "bg-red-50 border-red-200" },
 };
 
-const TYPE_STYLE: Record<string, string> = {
-  AT: "bg-blue-100 text-blue-700",
-  A:  "bg-green-100 text-green-700",
-  BT: "bg-purple-100 text-purple-700",
-};
-
 export default function SimulatorPage() {
   const [number, setNumber] = useState("");
   const [total, setTotal] = useState("200");
@@ -78,10 +74,7 @@ export default function SimulatorPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">入場番号シミュレーター</h1>
-        <p className="text-sm text-gray-500 mt-1">番号を入れると狙い台ランキングを即出力</p>
-      </div>
+      <PageHeader title="入場番号シミュレーター" description="番号を入れると狙い台ランキングを即出力" />
 
       {/* 入力 */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-4">
@@ -92,7 +85,7 @@ export default function SimulatorPage() {
               type="number"
               value={total}
               onChange={e => setTotal(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A5C]/30"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
               placeholder="200"
             />
           </div>
@@ -103,7 +96,7 @@ export default function SimulatorPage() {
               value={number}
               onChange={e => setNumber(e.target.value)}
               onKeyDown={e => e.key === "Enter" && run()}
-              className="w-full border-2 border-[#1A3A5C] rounded-lg px-4 py-3 text-2xl font-bold text-center focus:outline-none focus:ring-2 focus:ring-[#1A3A5C]/30"
+              className="w-full border-2 border-brand rounded-lg px-4 py-3 text-2xl font-bold text-center focus:outline-none focus:ring-2 focus:ring-brand/30"
               placeholder="—"
               autoFocus
             />
@@ -111,7 +104,7 @@ export default function SimulatorPage() {
           <button
             onClick={run}
             disabled={loading}
-            className="bg-[#1A3A5C] text-white px-6 py-3 rounded-lg font-bold text-sm hover:bg-[#2a5a8c] disabled:opacity-40 transition-colors whitespace-nowrap"
+            className="bg-brand text-white px-6 py-3 rounded-lg font-bold text-sm hover:bg-brand-light disabled:opacity-40 transition-colors whitespace-nowrap"
           >
             {loading ? "..." : "判定"}
           </button>
@@ -181,10 +174,8 @@ export default function SimulatorPage() {
                   {/* 台情報 */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-lg font-black text-[#1A3A5C]">{rec.machine_number}番</span>
-                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${TYPE_STYLE[rec.machine_type]}`}>
-                        {rec.machine_type === "A" ? "Aタイプ" : rec.machine_type + "機"}
-                      </span>
+                      <span className="text-lg font-black text-brand">{rec.machine_number}番</span>
+                      <TypeBadge type={rec.machine_type} />
                       {rec.tags.map(t => (
                         <span key={t} className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
                           {t}
@@ -194,7 +185,7 @@ export default function SimulatorPage() {
                     <div className="text-sm text-gray-700 mt-0.5 truncate">{rec.model_name}</div>
                     <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
                       <span className={rec.avg_diff >= 0 ? "text-green-700 font-bold" : "text-red-500 font-bold"}>
-                        平均 {rec.avg_diff >= 0 ? "+" : ""}{rec.avg_diff.toLocaleString()}枚
+                        平均 {diffStr(rec.avg_diff)}枚
                       </span>
                       <span>勝率 {Math.round(rec.win_rate * 100)}%</span>
                       <span>{rec.n_days}回分</span>

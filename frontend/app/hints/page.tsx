@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { API } from "../lib/api";
+import PageHeader from "../components/PageHeader";
 
 type Hints = {
   date: string;
@@ -75,12 +75,10 @@ export default function HintsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">今日の示唆入力</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          ウスイ店長X・ococoichi・LINEオープンチャットの内容を貼り付け。ナナに自動反映されます。
-        </p>
-      </div>
+      <PageHeader
+        title="今日の示唆入力"
+        description="ウスイ店長X・ococoichi・LINEオープンチャットの内容を貼り付け。ナナに自動反映されます。"
+      />
 
       {savedAt && (
         <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
@@ -115,7 +113,7 @@ export default function HintsPage() {
             }}
             placeholder={"投稿日時ごとコピペ（例）\n7月6日 8:23 AM\n今日も頑張っていきましょう🎯\n\n→ ナナが日時を見て当日示唆か前日結果かを自動判定します\n画像コピー中にここでCtrl+Vすると画像として追加されます"}
             rows={3}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A3A5C]/30 resize-y text-gray-700 placeholder-gray-300"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand/30 resize-y text-gray-700 placeholder-gray-300"
           />
         </div>
 
@@ -144,7 +142,7 @@ export default function HintsPage() {
             }}
             placeholder={"投稿日時ごとコピペ\n夜ポストは答え合わせ、朝ポストは示唆補助としてナナが解釈します\n画像コピー中にここでCtrl+Vすると画像として追加されます"}
             rows={3}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A3A5C]/30 resize-y text-gray-700 placeholder-gray-300"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand/30 resize-y text-gray-700 placeholder-gray-300"
           />
         </div>
 
@@ -159,7 +157,7 @@ export default function HintsPage() {
             onChange={(e) => setOpenchat(e.target.value)}
             placeholder="当月まとめや直近の傾向コメントをコピペ"
             rows={3}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A3A5C]/30 resize-y text-gray-700 placeholder-gray-300"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand/30 resize-y text-gray-700 placeholder-gray-300"
           />
         </div>
       </div>
@@ -168,7 +166,7 @@ export default function HintsPage() {
         <button
           onClick={save}
           disabled={saving || !hasContent}
-          className="bg-[#1A3A5C] text-white px-8 py-2.5 rounded-lg font-bold text-sm hover:bg-[#2a5a8c] disabled:opacity-40 transition-colors"
+          className="bg-brand text-white px-8 py-2.5 rounded-lg font-bold text-sm hover:bg-brand-light disabled:opacity-40 transition-colors"
         >
           {saving ? "保存中..." : "保存してナナに反映"}
         </button>
@@ -225,8 +223,8 @@ function ImageDropZone({
       onDrop={(e) => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files); }}
       onPaste={handlePaste}
       tabIndex={0}
-      className={`rounded-lg border-2 border-dashed transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-[#1A3A5C]/30 ${
-        dragging ? "border-[#1A3A5C] bg-blue-50" : "border-gray-200 bg-gray-50"
+      className={`rounded-lg border-2 border-dashed transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-brand/30 ${
+        dragging ? "border-brand bg-blue-50" : "border-gray-200 bg-gray-50"
       }`}
       onClick={() => inputRef.current?.click()}
     >
@@ -258,7 +256,7 @@ function ImageDropZone({
             </div>
           ))}
           <div
-            className="h-20 w-16 flex items-center justify-center rounded border-2 border-dashed border-gray-300 text-gray-400 text-xs cursor-pointer hover:border-[#1A3A5C] hover:text-[#1A3A5C] transition-colors"
+            className="h-20 w-16 flex items-center justify-center rounded border-2 border-dashed border-gray-300 text-gray-400 text-xs cursor-pointer hover:border-brand hover:text-brand transition-colors"
             onClick={() => inputRef.current?.click()}
           >
             ＋

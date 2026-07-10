@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { API } from "../lib/api";
 
 type Message = {
   role: "user" | "assistant";
@@ -119,7 +118,7 @@ export default function AIPage() {
               <div
                 className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
                   m.role === "user"
-                    ? "bg-[#1A3A5C] text-white rounded-br-none whitespace-pre-wrap leading-relaxed"
+                    ? "bg-brand text-white rounded-br-none whitespace-pre-wrap leading-relaxed"
                     : "bg-gray-100 text-gray-800 rounded-bl-none"
                 }`}
               >
@@ -189,13 +188,13 @@ export default function AIPage() {
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === "Enter" && !e.shiftKey && send(input)}
               placeholder="例: 35番引いた。今日7の日で何を狙う？"
-              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A5C]/30"
+              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
               disabled={loading}
             />
             <button
               onClick={() => send(input)}
               disabled={loading || !input.trim()}
-              className="bg-[#1A3A5C] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#2a5a8c] disabled:opacity-40 transition-colors"
+              className="bg-brand text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-brand-light disabled:opacity-40 transition-colors"
             >
               送信
             </button>
