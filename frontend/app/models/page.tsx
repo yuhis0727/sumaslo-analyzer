@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import Link from "next/link";
 import EventOrNSelector, { FilterMode, EventName } from "../components/EventOrNSelector";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
-type MachineType = "AT" | "A" | "BT";
-type TypeFilter = "all" | MachineType;
+import TypeFilterTabs, { TypeFilter } from "../components/TypeFilterTabs";
+import { MachineType, WinBar, TypeBadge } from "../components/Badges";
+import { ResponsiveTable } from "../components/ResponsiveTable";
+import { API } from "../lib/api";
+import { diffStr } from "../lib/format";
 
 type ModelStat = {
   model_name: string;
@@ -19,25 +19,6 @@ type ModelStat = {
   n_days: number;
   monthly_avg: Record<string, number>;
 };
-
-function WinBar({ rate }: { rate: number }) {
-  const pct = Math.round(rate * 100);
-  const color =
-    pct >= 80 ? "bg-green-500" :
-    pct >= 65 ? "bg-green-400" :
-    pct >= 50 ? "bg-yellow-400" :
-    "bg-gray-300";
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-24 bg-gray-100 rounded-full h-2">
-        <div className={`h-2 rounded-full ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className={`text-sm font-bold ${pct >= 65 ? "text-green-700" : "text-gray-600"}`}>
-        {pct}%
-      </span>
-    </div>
-  );
-}
 
 export default function ModelsPage() {
   const [mode, setMode] = useState<FilterMode>("n");
@@ -76,58 +57,67 @@ export default function ModelsPage() {
         />
       </div>
 
-      <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 self-start">
-        {(["all", "AT", "A", "BT"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTypeFilter(t)}
-            className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
-              typeFilter === t
-                ? t === "A" ? "bg-green-600 text-white"
-                : t === "BT" ? "bg-purple-600 text-white"
-                : t === "AT" ? "bg-blue-600 text-white"
-                : "bg-white text-gray-700 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {t === "all" ? "全機種" : t === "A" ? "Aタイプ" : t + "機"}
-          </button>
-        ))}
-      </div>
+      <TypeFilterTabs value={typeFilter} onChange={setTypeFilter} allLabel="全機種" />
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 text-sm text-gray-400">
           {modeLabel} の機種別勝率（機種全体の平均）
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#1A3A5C] text-white text-xs">
-                <th className="px-4 py-3 text-left w-8">#</th>
-                <th className="px-4 py-3 text-left">機種名</th>
-                <th className="px-4 py-3 text-center">台数</th>
-                <th className="px-4 py-3 text-left">勝率</th>
-                <th className="px-4 py-3 text-right">平均差枚</th>
-                {recentMonths.map(ym => (
-                  <th key={ym} className="px-3 py-3 text-right whitespace-nowrap">{ym.slice(5)}月平均</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading ? (
-                <tr><td colSpan={5 + recentMonths.length} className="text-center py-12 text-gray-400">読み込み中...</td></tr>
-              ) : (
-                filtered.map((m, i) => (
+        <ResponsiveTable
+          loading={loading}
+          empty={filtered.length === 0}
+          mobile={filtered.map((m, i) => (
+            <div key={m.model_name} className={`px-4 py-3 ${m.win_rate >= 0.65 ? "bg-green-50/40" : ""}`}>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs text-gray-400 shrink-0">{i + 1}</span>
+                <TypeBadge type={m.machine_type} short />
+                <Link href={`/models/${encodeURIComponent(m.model_name)}`} className="font-medium text-gray-800 truncate hover:text-brand hover:underline">
+                  {m.model_name}
+                </Link>
+              </div>
+              <div className="flex items-center justify-between gap-2 mt-1.5">
+                <WinBar rate={m.win_rate} />
+                <span className={`text-sm font-medium shrink-0 ${m.avg_diff >= 0 ? "text-green-700" : "text-red-500"}`}>
+                  {diffStr(m.avg_diff)}枚
+                </span>
+              </div>
+              {recentMonths.length > 0 && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-400">
+                  <span>{m.n_machines}台</span>
+                  {recentMonths.map(ym => {
+                    const v = m.monthly_avg?.[ym];
+                    return (
+                      <span key={ym} className={v == null ? "" : v >= 0 ? "text-green-600" : "text-red-400"}>
+                        {ym.slice(5)}月{v == null ? "—" : diffStr(v)}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+          desktop={
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-brand text-white text-xs">
+                  <th className="px-4 py-3 text-left w-8">#</th>
+                  <th className="px-4 py-3 text-left">機種名</th>
+                  <th className="px-4 py-3 text-center">台数</th>
+                  <th className="px-4 py-3 text-left">勝率</th>
+                  <th className="px-4 py-3 text-right">平均差枚</th>
+                  {recentMonths.map(ym => (
+                    <th key={ym} className="px-3 py-3 text-right whitespace-nowrap">{ym.slice(5)}月平均</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((m, i) => (
                   <tr key={m.model_name} className={`hover:bg-gray-50 ${m.win_rate >= 0.65 ? "bg-green-50/40" : ""}`}>
                     <td className="px-4 py-2.5 text-gray-400 text-xs">{i + 1}</td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded shrink-0 ${
-                          m.machine_type === "A" ? "bg-green-100 text-green-700" :
-                          m.machine_type === "BT" ? "bg-purple-100 text-purple-700" :
-                          "bg-blue-100 text-blue-700"
-                        }`}>{m.machine_type === "A" ? "A" : m.machine_type}</span>
-                        <Link href={`/models/${encodeURIComponent(m.model_name)}`} className="font-medium text-gray-800 hover:text-[#1A3A5C] hover:underline">
+                        <TypeBadge type={m.machine_type} short />
+                        <Link href={`/models/${encodeURIComponent(m.model_name)}`} className="font-medium text-gray-800 hover:text-brand hover:underline">
                           {m.model_name}
                         </Link>
                       </div>
@@ -136,23 +126,23 @@ export default function ModelsPage() {
                     <td className="px-4 py-2.5"><WinBar rate={m.win_rate} /></td>
                     <td className="px-4 py-2.5 text-right">
                       <span className={m.avg_diff >= 0 ? "text-green-700 font-medium" : "text-red-500"}>
-                        {m.avg_diff >= 0 ? "+" : ""}{m.avg_diff.toLocaleString()}枚
+                        {diffStr(m.avg_diff)}枚
                       </span>
                     </td>
                     {recentMonths.map(ym => {
                       const v = m.monthly_avg?.[ym];
                       return (
                         <td key={ym} className={`px-3 py-2.5 text-right text-xs font-mono ${v == null ? "text-gray-300" : v >= 0 ? "text-green-600" : "text-red-400"}`}>
-                          {v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toLocaleString()}`}
+                          {v == null ? "—" : diffStr(v)}
                         </td>
                       );
                     })}
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          }
+        />
       </div>
     </div>
   );

@@ -1109,3 +1109,114 @@ def get_new_machines(intro_threshold_days: int = Query(30, ge=7)):
         })
 
     return {"models": models_out, "weekly_aggregate": weekly_agg}
+
+
+# ── /api/data/allocation ────────────────────────
+@router.get("/data/allocation")
+def get_allocation(
+    n: int | None = Query(None, ge=1, le=9),
+    event: str | None = Query(None),
+    plain: bool = Query(False),
+    all_days: bool = Query(False),
+    min_days: int = Query(3, ge=1),
+):
+    """台数規模別の高配分予測。機種ごとに「その日種で何割の台がプラスになるか」を集計する。"""
+    if n is None and event is None and not plain and not all_days:
+        raise HTTPException(status_code=400, detail="n・event・plain・all_days のいずれかを指定してください")
+
+    df = _get_df()
+    latest_date = df["date"].max()
+    current_machines = set(df[df["date"] == latest_date]["machine_number"])
+
+    # 現機種のみ・現在稼働台のみ
+    df_cur = _filter_current_model_only(df[df["machine_number"].isin(current_machines)])
+
+    # 日種フィルタ
+    df_n = df_cur.copy() if all_days else _filter_by_event_or_n(df_cur, n, event, plain)
+
+    # 現在の機種別台数
+    current_counts = (
+        df[df["date"] == latest_date]
+        .groupby("model_name")["machine_number"].count()
+        .rename("current_count")
+    )
+
+    # 日付×機種ごとに「何台プラスか / 総台数」を計算
+    daily = (
+        df_n.groupby(["date", "model_name"])
+        .agg(
+            total=("total_diff", "count"),
+            positive=("total_diff", lambda x: (x > 0).sum()),
+        )
+        .reset_index()
+    )
+    daily["ratio"] = daily["positive"] / daily["total"]
+    daily["is_full"] = daily["ratio"] >= 0.8   # 全台系とみなす閾値
+
+    # 機種別に集計
+    stats = (
+        daily.groupby("model_name")
+        .agg(
+            n_days=("ratio", "count"),
+            avg_ratio=("ratio", "mean"),
+            median_ratio=("ratio", "median"),
+            full_rate=("is_full", "mean"),       # 全台系になった日の割合
+            avg_positive=("positive", "mean"),   # 平均プラス台数
+            avg_total=("total", "mean"),          # 平均総台数（その日の稼働台数）
+        )
+        .reset_index()
+        .query(f"n_days >= {min_days}")
+    )
+
+    # 現在台数をマージ
+    stats = stats.merge(current_counts, on="model_name", how="left")
+    stats["current_count"] = stats["current_count"].fillna(0).astype(int)
+
+    # 機種タイプ
+    stats["machine_type"] = stats["model_name"].apply(_model_type)
+
+    # 規模分類
+    def _scale(cnt: int) -> str:
+        if cnt <= 4:
+            return "small"
+        if cnt <= 12:
+            return "medium"
+        return "large"
+
+    stats["scale"] = stats["current_count"].apply(_scale)
+
+    # 傾向ラベル
+    def _pattern(row) -> str:
+        r = row["avg_ratio"]
+        if r >= 0.75:
+            return "全台系濃厚"
+        if r >= 0.55:
+            return "1/2集中寄り"
+        if r >= 0.40:
+            return "一部高設定"
+        return "回収傾向"
+
+    stats["pattern"] = stats.apply(_pattern, axis=1)
+
+    # 出力整形
+    def _row(r) -> dict:
+        return {
+            "model_name": r["model_name"],
+            "machine_type": r["machine_type"],
+            "current_count": int(r["current_count"]),
+            "scale": r["scale"],
+            "n_days": int(r["n_days"]),
+            "avg_ratio": round(float(r["avg_ratio"]), 3),
+            "median_ratio": round(float(r["median_ratio"]), 3),
+            "full_rate": round(float(r["full_rate"]), 3),
+            "avg_positive": round(float(r["avg_positive"]), 1),
+            "pattern": r["pattern"],
+        }
+
+    rows = [_row(r) for _, r in stats.sort_values("avg_ratio", ascending=False).iterrows()]
+
+    return {
+        "small":  [r for r in rows if r["scale"] == "small"],
+        "medium": [r for r in rows if r["scale"] == "medium"],
+        "large":  [r for r in rows if r["scale"] == "large"],
+    }

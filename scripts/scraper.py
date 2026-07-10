@@ -19,10 +19,10 @@ from selenium.webdriver.common.by import By
 # ------------------------------------------------------------------ #
 STORE = "maruhan_kamata7"
 TAG_URL = "https://min-repo.com/tag/%e3%83%9e%e3%83%ab%e3%83%8f%e3%83%b3%e3%83%a1%e3%82%ac%e3%82%b7%e3%83%86%e3%82%a32000%e8%92%b2%e7%94%b07/"
-START_DATE = date(2026, 6, 19)
-END_DATE   = date(2026, 7, 2)
+START_DATE = date(2026, 7, 3)
+END_DATE   = date(2026, 7, 9)
 OUTPUT_CSV = f"minrepo_{STORE}_browser.csv"
-TODAY      = date(2026, 7, 3)
+TODAY      = date(2026, 7, 10)
 HEADERS    = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
 IS_VPS = (platform.system() == "Linux" and not os.environ.get("DISPLAY"))

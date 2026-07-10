@@ -6,8 +6,10 @@ import axios from "axios";
 import Link from "next/link";
 import { ResponsiveLine } from "@nivo/line";
 import { EVENT_NAMES, EventName } from "../../components/EventOrNSelector";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { MachineType, TypeBadge, WinBadge } from "../../components/Badges";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
+import { API } from "../../lib/api";
+import { diffStr, diffColor } from "../../lib/format";
 
 type ViewMode = "all" | "n" | "event" | "plain";
 type Monthly = { month: string; avg_diff: number; win_rate: number; n: number };
@@ -16,7 +18,7 @@ type DayRecord = { date: string; model_name: string; total_diff: number | null; 
 
 type Detail = {
   machine_number: number;
-  machine_type: string;
+  machine_type: MachineType;
   model_name: string;
   summary: { n_days: number; win_rate: number; avg_diff: number; total_diff: number };
   monthly: Monthly[];
@@ -25,14 +27,6 @@ type Detail = {
   plain_stats: EventStat | null;
   records: DayRecord[];
 };
-
-function diffColor(v: number) { return v >= 0 ? "text-green-600" : "text-red-500"; }
-function diffStr(v: number) { return `${v >= 0 ? "+" : ""}${v.toLocaleString()}`; }
-function winBadge(r: number) {
-  const pct = Math.round(r * 100);
-  const cls = pct >= 80 ? "bg-green-600 text-white" : pct >= 65 ? "bg-green-400 text-white" : pct >= 50 ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-500";
-  return <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${cls}`}>{pct}%</span>;
-}
 
 function buildQuery(mode: ViewMode, n: number, event: EventName): string {
   if (mode === "n") return `?n=${n}`;
@@ -82,12 +76,6 @@ export default function MachineDetailPage() {
       .map(r => ({ x: r.date, y: r.total_diff as number })),
   }] : [];
 
-  const typeBadgeClass = !data ? "" :
-    data.machine_type === "A" ? "bg-green-100 text-green-700" :
-    data.machine_type === "BT" ? "bg-purple-100 text-purple-700" :
-    "bg-blue-100 text-blue-700";
-  const typeLabel = !data ? "" : data.machine_type === "A" ? "Aタイプ" : data.machine_type + "機";
-
   const modeLabel = viewMode === "n" ? `${viewN}の日` : viewMode === "event" ? viewEvent : MODE_LABELS[viewMode];
 
   return (
@@ -99,8 +87,8 @@ export default function MachineDetailPage() {
           {data && (
             <>
               <div className="flex items-center gap-3">
-                <div className="text-3xl font-bold text-[#1A3A5C]">{data.machine_number}番</div>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded ${typeBadgeClass}`}>{typeLabel}</span>
+                <div className="text-3xl font-bold text-brand">{data.machine_number}番</div>
+                <TypeBadge type={data.machine_type} />
               </div>
               <Link href={`/models/${encodeURIComponent(data.model_name)}`} className="text-gray-600 hover:underline text-lg">
                 {data.model_name}
@@ -119,7 +107,7 @@ export default function MachineDetailPage() {
               onClick={() => handleMode(m)}
               className={`px-3 py-1.5 transition-colors ${
                 viewMode === m
-                  ? m === "plain" ? "bg-gray-600 text-white" : "bg-[#1A3A5C] text-white"
+                  ? m === "plain" ? "bg-gray-600 text-white" : "bg-brand text-white"
                   : "bg-white text-gray-600 hover:bg-gray-50"
               }`}
             >
@@ -133,7 +121,7 @@ export default function MachineDetailPage() {
             {[1,2,3,4,5,6,7,8,9].map(v => (
               <button key={v} onClick={() => handleN(v)}
                 className={`w-8 h-8 rounded text-sm font-bold transition-colors ${
-                  viewN === v ? "bg-[#1A3A5C] text-white" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  viewN === v ? "bg-brand text-white" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
                 }`}>{v}</button>
             ))}
           </div>
@@ -164,7 +152,7 @@ export default function MachineDetailPage() {
             <div className="text-xs text-gray-400 mb-2">{modeLabel} の集計</div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "勝率", value: winBadge(data.summary.win_rate) },
+                { label: "勝率", value: <WinBadge rate={data.summary.win_rate} /> },
                 { label: "平均差枚", value: <span className={`text-xl font-bold ${diffColor(data.summary.avg_diff)}`}>{diffStr(data.summary.avg_diff)}</span> },
                 { label: "累計差枚", value: <span className={`text-xl font-bold ${diffColor(data.summary.total_diff)}`}>{diffStr(data.summary.total_diff)}</span> },
                 { label: "日数", value: <span className="text-xl font-bold text-gray-800">{data.summary.n_days}日</span> },
@@ -249,7 +237,7 @@ export default function MachineDetailPage() {
                         <tr key={name} className={viewMode === "event" && viewEvent === name ? "bg-amber-50" : ""}>
                           <td className="py-1.5 text-gray-700 text-xs">{name}</td>
                           <td className="py-1.5 text-right text-gray-400">{s.n_days}回</td>
-                          <td className="py-1.5 text-right">{winBadge(s.win_rate)}</td>
+                          <td className="py-1.5 text-right"><WinBadge rate={s.win_rate} /></td>
                           <td className={`py-1.5 text-right font-mono font-medium ${diffColor(s.avg_diff)}`}>{diffStr(s.avg_diff)}</td>
                         </tr>
                       ))}
@@ -257,7 +245,7 @@ export default function MachineDetailPage() {
                         <tr className={`${viewMode === "plain" ? "bg-gray-100" : "bg-gray-50/60"}`}>
                           <td className="py-1.5 text-gray-500 text-xs">平常日</td>
                           <td className="py-1.5 text-right text-gray-400">{data.plain_stats.n_days}回</td>
-                          <td className="py-1.5 text-right">{winBadge(data.plain_stats.win_rate)}</td>
+                          <td className="py-1.5 text-right"><WinBadge rate={data.plain_stats.win_rate} /></td>
                           <td className={`py-1.5 text-right font-mono font-medium ${diffColor(data.plain_stats.avg_diff)}`}>{diffStr(data.plain_stats.avg_diff)}</td>
                         </tr>
                       )}
@@ -275,9 +263,9 @@ export default function MachineDetailPage() {
                   <tbody className="divide-y divide-gray-50">
                     {Object.entries(data.n_day_stats).sort((a, b) => Number(a[0]) - Number(b[0])).map(([n, s]) => (
                       <tr key={n} className={viewMode === "n" && viewN === Number(n) ? "bg-blue-50" : ""}>
-                        <td className="py-1.5 font-bold text-[#1A3A5C]">{n}の日</td>
+                        <td className="py-1.5 font-bold text-brand">{n}の日</td>
                         <td className="py-1.5 text-right text-gray-400">{s.n_days}回</td>
-                        <td className="py-1.5 text-right">{winBadge(s.win_rate)}</td>
+                        <td className="py-1.5 text-right"><WinBadge rate={s.win_rate} /></td>
                         <td className={`py-1.5 text-right font-mono font-medium ${diffColor(s.avg_diff)}`}>{diffStr(s.avg_diff)}</td>
                       </tr>
                     ))}
@@ -292,31 +280,54 @@ export default function MachineDetailPage() {
             <div className="p-4 border-b border-gray-100 font-semibold text-gray-700">
               日別履歴（{data.records.length}日）<span className="text-xs font-normal text-gray-400 ml-2">{modeLabel}</span>
             </div>
-            <div className="overflow-x-auto max-h-96 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600 text-xs sticky top-0">
-                  <tr>
-                    <th className="px-4 py-2 text-left">日付</th>
-                    <th className="px-4 py-2 text-left">曜</th>
-                    <th className="px-4 py-2 text-left">機種名</th>
-                    <th className="px-4 py-2 text-right">差枚</th>
-                    <th className="px-4 py-2 text-right">G数</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...data.records].reverse().map((r: DayRecord, i) => (
-                    <tr key={i} className={`border-t border-gray-50 hover:bg-gray-50 ${(r.total_diff ?? 0) >= 0 ? "bg-green-50/20" : ""}`}>
-                      <td className="px-4 py-2 font-mono text-gray-600">{r.date}</td>
-                      <td className="px-4 py-2 text-gray-400">{r.day_of_week}</td>
-                      <td className="px-4 py-2 text-gray-600 truncate max-w-[200px]">{r.model_name}</td>
-                      <td className={`px-4 py-2 text-right font-mono font-medium ${diffColor(r.total_diff ?? 0)}`}>
+            <div className="max-h-96 overflow-y-auto">
+              <ResponsiveTable
+                loading={false}
+                empty={data.records.length === 0}
+                mobile={[...data.records].reverse().map((r: DayRecord, i) => (
+                  <div key={i} className={`px-4 py-2.5 ${(r.total_diff ?? 0) >= 0 ? "bg-green-50/20" : ""}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-xs text-gray-600">{r.date}</span>
+                        <span className="text-xs text-gray-400">{r.day_of_week}</span>
+                      </div>
+                      <span className={`text-sm font-mono font-medium ${diffColor(r.total_diff ?? 0)}`}>
                         {r.total_diff != null ? diffStr(r.total_diff) : "—"}
-                      </td>
-                      <td className="px-4 py-2 text-right text-gray-400">{r.game_count?.toLocaleString() ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-1 text-xs text-gray-500">
+                      <span className="truncate">{r.model_name}</span>
+                      <span className="text-gray-400 shrink-0">{r.game_count?.toLocaleString() ?? "—"}G</span>
+                    </div>
+                  </div>
+                ))}
+                desktop={
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-600 text-xs sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2 text-left">日付</th>
+                        <th className="px-4 py-2 text-left">曜</th>
+                        <th className="px-4 py-2 text-left">機種名</th>
+                        <th className="px-4 py-2 text-right">差枚</th>
+                        <th className="px-4 py-2 text-right">G数</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...data.records].reverse().map((r: DayRecord, i) => (
+                        <tr key={i} className={`border-t border-gray-50 hover:bg-gray-50 ${(r.total_diff ?? 0) >= 0 ? "bg-green-50/20" : ""}`}>
+                          <td className="px-4 py-2 font-mono text-gray-600">{r.date}</td>
+                          <td className="px-4 py-2 text-gray-400">{r.day_of_week}</td>
+                          <td className="px-4 py-2 text-gray-600 truncate max-w-[200px]">{r.model_name}</td>
+                          <td className={`px-4 py-2 text-right font-mono font-medium ${diffColor(r.total_diff ?? 0)}`}>
+                            {r.total_diff != null ? diffStr(r.total_diff) : "—"}
+                          </td>
+                          <td className="px-4 py-2 text-right text-gray-400">{r.game_count?.toLocaleString() ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                }
+              />
             </div>
           </div>
         </>
