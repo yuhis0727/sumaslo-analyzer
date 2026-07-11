@@ -14,6 +14,7 @@ const PRIMARY = [
 
 /** 分析・データ確認（事前準備・検証に使うページ） */
 const ANALYSIS = [
+  { href: '/predictions', label: '予測履歴' },
   { href: '/machines', label: '台番分析' },
   { href: '/models', label: '機種別分析' },
   { href: '/analytics/allocation', label: '高配分予測' },

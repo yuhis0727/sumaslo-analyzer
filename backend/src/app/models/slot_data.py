@@ -29,7 +29,6 @@ class Store(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     machines = relationship("Machine", back_populates="store")
-    predictions = relationship("Prediction", back_populates="store")
     scraping_logs = relationship("ScrapingLog", back_populates="store")
 
 
@@ -52,24 +51,6 @@ class Machine(Base):
     created_at = Column(DateTime, default=datetime.now)
 
     store = relationship("Store", back_populates="machines")
-
-
-class Prediction(Base):
-    """予測結果 (predictions テーブル)"""
-
-    __tablename__ = "predictions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
-    machine_number = Column(Integer, nullable=False)
-    model_name = Column(String(255), nullable=False)
-    date = Column(Date, nullable=False)
-    prediction_score = Column(Float, nullable=False)   # 高設定スコア (0〜1)
-    predicted_setting = Column(Integer, nullable=True) # 予測設定 (1〜6)
-    confidence = Column(Float, nullable=False)         # 信頼度スコア (0〜1)
-    created_at = Column(DateTime, default=datetime.now)
-
-    store = relationship("Store", back_populates="predictions")
 
 
 class TheoreticalValue(Base):

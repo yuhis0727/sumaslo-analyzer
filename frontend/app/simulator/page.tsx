@@ -50,6 +50,8 @@ export default function SimulatorPage() {
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const run = async () => {
     const n = parseInt(number);
@@ -58,6 +60,7 @@ export default function SimulatorPage() {
     if (n > t) { setError(`番号が参加者数(${t})を超えています`); return; }
     setError("");
     setLoading(true);
+    setSaved(false);
     try {
       const r = await axios.get<Result>(`${API}/api/simulator/recommend`, {
         params: { number: n, total: t },
@@ -67,6 +70,26 @@ export default function SimulatorPage() {
       setError("データ取得エラー");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const savePrediction = async () => {
+    if (!result) return;
+    setSaving(true);
+    try {
+      await axios.post(`${API}/api/predictions`, {
+        number: result.number,
+        total: result.total,
+        tier: result.tier,
+        day_label: result.day_label,
+        event_n: result.event_n,
+        recommendations: result.recommendations,
+      });
+      setSaved(true);
+    } catch {
+      setError("予測の保存に失敗しました");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -117,26 +140,39 @@ export default function SimulatorPage() {
         <div className="space-y-4">
           {/* 判定バナー */}
           <div className={`rounded-xl border p-5 ${tier.light}`}>
-            <div className="flex items-center gap-4">
-              <div className={`${tier.bg} text-white text-3xl font-black px-6 py-3 rounded-xl`}>
-                {result.tier}
-              </div>
-              <div>
-                <div className="text-lg font-bold text-gray-800">
-                  {result.number}番 / {result.total}人中
-                  <span className={`ml-2 text-sm font-normal ${tier.text}`}>
-                    上位 {result.percentile.toFixed(0)}%
-                  </span>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div className="flex items-center gap-4">
+                <div className={`${tier.bg} text-white text-3xl font-black px-6 py-3 rounded-xl`}>
+                  {result.tier}
                 </div>
-                <div className="text-sm text-gray-500 mt-0.5">
-                  {result.day_label}のデータ基準
-                  {result.today_events.length > 0 && (
-                    <span className="ml-2 bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full">
-                      {result.today_events.join("・")}
+                <div>
+                  <div className="text-lg font-bold text-gray-800">
+                    {result.number}番 / {result.total}人中
+                    <span className={`ml-2 text-sm font-normal ${tier.text}`}>
+                      上位 {result.percentile.toFixed(0)}%
                     </span>
-                  )}
+                  </div>
+                  <div className="text-sm text-gray-500 mt-0.5">
+                    {result.day_label}のデータ基準
+                    {result.today_events.length > 0 && (
+                      <span className="ml-2 bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full">
+                        {result.today_events.join("・")}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
+              <button
+                onClick={savePrediction}
+                disabled={saving || saved}
+                className={`shrink-0 px-4 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${
+                  saved
+                    ? "bg-green-100 text-green-700"
+                    : "bg-brand text-white hover:bg-brand-light disabled:opacity-40"
+                }`}
+              >
+                {saved ? "保存済み" : saving ? "保存中..." : "この予測を保存"}
+              </button>
             </div>
             <p className="mt-3 text-sm text-gray-700 leading-relaxed">{result.strategy}</p>
           </div>
