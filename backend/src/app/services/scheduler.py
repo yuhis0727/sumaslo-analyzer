@@ -21,10 +21,10 @@ from datetime import date, datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from src.app.ml.features import SCRAPE_INTERVAL_SECONDS, UPDATE_HOUR
+UPDATE_HOUR = 12  # 毎日12時に更新（営業終了後のデータが揃う時間）
 
 # アクセス間隔 (スクレイピング規約遵守)
-_SCRAPE_INTERVAL = SCRAPE_INTERVAL_SECONDS
+_SCRAPE_INTERVAL = 2.5
 _MAX_RETRIES = 3
 
 _scheduler = BackgroundScheduler(timezone="Asia/Tokyo")

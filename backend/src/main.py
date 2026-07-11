@@ -4,7 +4,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.app.api.endpoints.health_check import health_check
-from src.app.api.endpoints.slots import router as slots_router
 from src.app.api.endpoints.csv_data import router as csv_router
 from src.app.api.endpoints.ai_chat import router as ai_router
 from src.app.api.endpoints.simulator import router as simulator_router
@@ -47,7 +46,6 @@ app.add_middleware(
 
 # エンドポイントのルーティング
 app.include_router(health_check, prefix="/_health")
-app.include_router(slots_router, prefix="/api", tags=["slots"])
 app.include_router(csv_router, prefix="/api", tags=["csv-data"])
 app.include_router(ai_router, prefix="/api", tags=["ai"])
 app.include_router(simulator_router, prefix="/api", tags=["simulator"])
