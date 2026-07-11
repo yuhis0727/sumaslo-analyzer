@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { API } from "../lib/api";
 
 type Message = {
@@ -129,6 +130,7 @@ export default function AIPage() {
                   m.text
                 ) : m.text ? (
                   <Markdown
+                    remarkPlugins={[remarkGfm]}
                     components={{
                       h1: ({ children }) => <h1 className="text-base font-bold mt-3 mb-1 text-gray-900 border-b border-gray-300 pb-1">{children}</h1>,
                       h2: ({ children }) => <h2 className="text-sm font-bold mt-3 mb-1 text-gray-800">{children}</h2>,
