@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+load_dotenv()
 
 from src.app.api.endpoints.health_check import health_check
 from src.app.api.endpoints.csv_data import router as csv_router
