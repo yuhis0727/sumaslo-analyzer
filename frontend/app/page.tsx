@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import Link from "next/link";
 import { API } from "./lib/api";
 import { diffStr } from "./lib/format";
 import { WinBadge, DiffText, DowBadge } from "./components/Badges";
@@ -43,12 +44,27 @@ type RecentDay = {
   avg_diff: number;
 };
 
+type HintsToday = {
+  store_post: string;
+  cocochi: string;
+  saved_at: string | null;
+};
+
+type PredictionEntry = {
+  id: string;
+  hit_rate: number | null;
+  judged_count: number;
+  total_count: number;
+};
+
 /** イベント日（7の日・ニャンギラス・月末大田区活性化）判定 */
 const isEventDay = (day: number) => [1, 7].includes(day % 10) || day === 30;
 
 export default function Dashboard() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [recent, setRecent] = useState<RecentDay[]>([]);
+  const [hints, setHints] = useState<HintsToday | null>(null);
+  const [todayPredictions, setTodayPredictions] = useState<PredictionEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,10 +72,14 @@ export default function Dashboard() {
     Promise.all([
       axios.get<Summary>(`${API}/api/data/summary`),
       axios.get<RecentDay[]>(`${API}/api/data/recent?days=7`),
+      axios.get<HintsToday>(`${API}/api/hints/today`),
+      axios.get<PredictionEntry[]>(`${API}/api/predictions`),
     ])
-      .then(([s, r]) => {
+      .then(([s, r, h, p]) => {
         setSummary(s.data);
         setRecent(r.data);
+        setHints(h.data);
+        setTodayPredictions(p.data);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -78,30 +98,95 @@ export default function Dashboard() {
 
   const today = new Date(summary.today);
   const dateStr = `${today.getMonth() + 1}/${today.getDate()}`;
+  const isKessanMonth = today.getMonth() === 2; // 3月＝期末決算月
+
+  const hasHints = Boolean(hints?.saved_at);
+  const hintsPreview = hints?.store_post || hints?.cocochi || "";
+  const top5 = summary.top_machines.slice(0, 5);
+  const latestPrediction = todayPredictions[todayPredictions.length - 1];
 
   return (
     <div className="space-y-6">
-      {/* ヘッダー情報 */}
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">ダッシュボード</h1>
-        <span className="text-gray-500 text-lg">{dateStr}</span>
-        <DowBadge dow={summary.day_of_week} suffix="曜日" />
-        {summary.event_n ? (
-          <span className="bg-brand text-white px-4 py-1 rounded-full text-sm font-bold">
-            🎯 {summary.event_n}の日（{summary.n_event_days}日分データ）
-          </span>
-        ) : (
-          <span className="bg-gray-200 text-gray-600 px-4 py-1 rounded-full text-sm">
-            通常日
-          </span>
+      {/* 本日のブリーフィング */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900">ダッシュボード</h1>
+          <span className="text-gray-500 text-lg">{dateStr}</span>
+          <DowBadge dow={summary.day_of_week} suffix="曜日" />
+          {summary.event_n ? (
+            <span className="bg-brand text-white px-4 py-1 rounded-full text-sm font-bold">
+              🎯 {summary.event_n}の日（{summary.n_event_days}日分データ）
+            </span>
+          ) : (
+            <span className="bg-gray-200 text-gray-600 px-4 py-1 rounded-full text-sm">
+              通常日
+            </span>
+          )}
+        </div>
+
+        {summary.message && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800 text-sm">
+            {summary.message}
+          </div>
+        )}
+
+        {isKessanMonth && (
+          <div className="bg-orange-50 border border-orange-200 text-orange-700 rounded-lg px-4 py-2 text-sm">
+            ⚠️ 決算月（3月）は回収傾向。設定投入は抑えめの可能性があります。
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link href="/hints" className="flex-1 flex items-center justify-between gap-2 bg-gray-50 hover:bg-gray-100 rounded-lg px-4 py-3 transition-colors">
+            <div className="min-w-0">
+              <div className="text-xs text-gray-500">示唆情報</div>
+              {hasHints ? (
+                <p className="text-sm text-gray-700 truncate mt-0.5">{hintsPreview || "画像のみ保存済み"}</p>
+              ) : (
+                <p className="text-sm text-gray-400 mt-0.5">未入力 — 入力する</p>
+              )}
+            </div>
+            <span className="text-gray-300 shrink-0">›</span>
+          </Link>
+
+          <Link href="/simulator" className="flex-1 flex items-center justify-between gap-2 bg-gray-50 hover:bg-gray-100 rounded-lg px-4 py-3 transition-colors">
+            <div className="min-w-0">
+              <div className="text-xs text-gray-500">今日の予測</div>
+              {!latestPrediction ? (
+                <p className="text-sm text-gray-400 mt-0.5">未保存 — 番号判定へ</p>
+              ) : (
+                <p className="text-sm text-gray-700 mt-0.5">
+                  保存済み
+                  {latestPrediction.hit_rate !== null && (
+                    <span className="ml-1 font-bold text-brand">（的中率{Math.round((latestPrediction.hit_rate ?? 0) * 100)}%）</span>
+                  )}
+                </p>
+              )}
+            </div>
+            <span className="text-gray-300 shrink-0">›</span>
+          </Link>
+        </div>
+
+        {summary.event_n && top5.length > 0 && (
+          <div>
+            <div className="text-xs text-gray-500 mb-2">🎯 本日の狙い候補 第1〜5位</div>
+            <div className="space-y-1.5">
+              {top5.map((m, i) => (
+                <div key={m.machine_number} className="flex items-center justify-between gap-2 text-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-5 h-5 shrink-0 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center">
+                      {i + 1}
+                    </span>
+                    <span className="font-bold text-brand shrink-0">{m.machine_number}番</span>
+                    <span className="text-gray-600 truncate">{m.model_name}</span>
+                  </div>
+                  <WinBadge rate={m.win_rate} pill />
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
-
-      {summary.message && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800">
-          {summary.message}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* おすすめ台 TOP10 */}
