@@ -9,13 +9,13 @@ import { LoadingState, ErrorAlert } from "../components/StateViews";
 import PageHeader from "../components/PageHeader";
 
 type Rec = {
-  priority: number;
+  priority: number | null;
   machine_number: number;
   model_name: string;
-  machine_type: MachineType;
-  win_rate: number;
-  avg_diff: number;
-  n_days: number;
+  machine_type: MachineType | null;
+  win_rate: number | null;
+  avg_diff: number | null;
+  n_days: number | null;
   reason: string;
   tags: string[];
   is_fixed6: boolean;
@@ -28,11 +28,12 @@ type Entry = {
   id: string;
   date: string;
   saved_at: string;
-  number: number;
-  total: number;
-  tier: "良番" | "中番" | "悪番";
-  day_label: string;
-  event_n: number;
+  source?: "simulator" | "chat";
+  number: number | null;
+  total: number | null;
+  tier: "良番" | "中番" | "悪番" | null;
+  day_label: string | null;
+  event_n: number | null;
   recommendations: Rec[];
   note: string;
   hit_rate: number | null;
@@ -40,7 +41,7 @@ type Entry = {
   total_count: number;
 };
 
-const TIER_STYLE: Record<Entry["tier"], string> = {
+const TIER_STYLE: Record<NonNullable<Entry["tier"]>, string> = {
   良番: "bg-green-500",
   中番: "bg-yellow-400",
   悪番: "bg-red-500",
@@ -147,35 +148,49 @@ export default function PredictionsPage() {
           <div key={entry.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
-                <span className={`${TIER_STYLE[entry.tier]} text-white text-xs font-black px-2 py-1 rounded`}>
-                  {entry.tier}
-                </span>
+                {entry.tier && (
+                  <span className={`${TIER_STYLE[entry.tier]} text-white text-xs font-black px-2 py-1 rounded`}>
+                    {entry.tier}
+                  </span>
+                )}
+                {entry.source === "chat" && (
+                  <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded">
+                    💬 ナナ
+                  </span>
+                )}
                 <span className="font-bold text-gray-800">{entry.date}</span>
-                <span className="text-xs text-gray-400">{entry.day_label}</span>
+                {entry.day_label && <span className="text-xs text-gray-400">{entry.day_label}</span>}
               </div>
               <HitRateBadge rate={entry.hit_rate} judged={entry.judged_count} total={entry.total_count} />
             </div>
 
-            <div className="text-xs text-gray-400 mt-1">
-              {entry.number}番 / {entry.total}人中
-            </div>
+            {entry.number != null && (
+              <div className="text-xs text-gray-400 mt-1">
+                {entry.number}番 / {entry.total}人中
+              </div>
+            )}
 
             <div className="mt-3 divide-y divide-gray-50">
               {entry.recommendations.map((rec) => (
-                <div key={rec.machine_number} className="py-2 flex items-center justify-between gap-2">
-                  <div className="min-w-0 flex items-center gap-2">
-                    <span className="font-bold text-brand text-sm shrink-0">{rec.machine_number}番</span>
-                    <TypeBadge type={rec.machine_type} short />
-                    <span className="text-xs text-gray-600 truncate">{rec.model_name}</span>
+                <div key={rec.machine_number} className="py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex items-center gap-2">
+                      <span className="font-bold text-brand text-sm shrink-0">{rec.machine_number}番</span>
+                      {rec.machine_type && <TypeBadge type={rec.machine_type} short />}
+                      <span className="text-xs text-gray-600 truncate">{rec.model_name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {rec.actual_diff !== null && (
+                        <span className={`text-xs font-mono font-medium ${rec.actual_diff >= 0 ? "text-green-700" : "text-red-500"}`}>
+                          {diffStr(rec.actual_diff)}枚
+                        </span>
+                      )}
+                      <HitBadge hit={rec.hit} />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {rec.actual_diff !== null && (
-                      <span className={`text-xs font-mono font-medium ${rec.actual_diff >= 0 ? "text-green-700" : "text-red-500"}`}>
-                        {diffStr(rec.actual_diff)}枚
-                      </span>
-                    )}
-                    <HitBadge hit={rec.hit} />
-                  </div>
+                  {rec.reason && (
+                    <div className="text-xs text-gray-400 mt-0.5">{rec.reason}</div>
+                  )}
                 </div>
               ))}
             </div>

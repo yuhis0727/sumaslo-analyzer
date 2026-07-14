@@ -1,13 +1,44 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import axios from "axios";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { API } from "../lib/api";
 
 type Message = {
   role: "user" | "assistant";
   text: string;
 };
+
+type PickItem = {
+  machine_number: number;
+  model_name: string;
+  reason: string;
+};
+
+const PICKS_START = "===PICKS===";
+const PICKS_END = "===END_PICKS===";
+
+/** ナナの返信本文から機械可読ブロックを除いた表示用テキスト */
+function displayText(text: string): string {
+  return text.split(PICKS_START)[0].trimEnd();
+}
+
+/** ナナの返信本文からPICKSブロックを抽出してパースする（失敗時はnull） */
+function extractPicks(text: string): PickItem[] | null {
+  const start = text.indexOf(PICKS_START);
+  const end = text.indexOf(PICKS_END);
+  if (start === -1 || end === -1 || end < start) return null;
+  const raw = text.slice(start + PICKS_START.length, end).trim();
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 const SUGGESTIONS = [
   "今日のおすすめ台は？",
@@ -25,7 +56,22 @@ export default function AIPage() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [savedIndices, setSavedIndices] = useState<Set<number>>(new Set());
+  const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const savePicks = async (index: number, picks: PickItem[]) => {
+    setSavingIndex(index);
+    try {
+      await axios.post(`${API}/api/predictions`, {
+        source: "chat",
+        recommendations: picks,
+      });
+      setSavedIndices(prev => new Set(prev).add(index));
+    } finally {
+      setSavingIndex(null);
+    }
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -128,7 +174,9 @@ export default function AIPage() {
                 {m.role === "user" ? (
                   m.text
                 ) : m.text ? (
+                  <>
                   <Markdown
+                    remarkPlugins={[remarkGfm]}
                     components={{
                       h1: ({ children }) => <h1 className="text-base font-bold mt-3 mb-1 text-gray-900 border-b border-gray-300 pb-1">{children}</h1>,
                       h2: ({ children }) => <h2 className="text-sm font-bold mt-3 mb-1 text-gray-800">{children}</h2>,
@@ -150,8 +198,27 @@ export default function AIPage() {
                       code: ({ children }) => <code className="bg-gray-200 rounded px-1 font-mono text-xs">{children}</code>,
                     }}
                   >
-                    {m.text}
+                    {displayText(m.text)}
                   </Markdown>
+                  {!(loading && i === messages.length - 1) && (() => {
+                    const picks = extractPicks(m.text);
+                    if (!picks) return null;
+                    const saved = savedIndices.has(i);
+                    return (
+                      <button
+                        onClick={() => savePicks(i, picks)}
+                        disabled={saved || savingIndex === i}
+                        className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                          saved
+                            ? "bg-green-100 text-green-700"
+                            : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                        }`}
+                      >
+                        {saved ? "保存済み" : savingIndex === i ? "保存中..." : "この回答を予測として保存"}
+                      </button>
+                    );
+                  })()}
+                  </>
                 ) : loading && i === messages.length - 1 ? (
                   <span className="inline-flex gap-1 py-1">
                     <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
