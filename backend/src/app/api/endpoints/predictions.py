@@ -42,25 +42,26 @@ def _save(data: dict) -> None:
 class RecommendationIn(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
-    priority: int
     machine_number: int
     model_name: str
-    machine_type: str
-    win_rate: float
-    avg_diff: int
-    n_days: int
-    reason: str
+    reason: str = ""
+    priority: int | None = None
+    machine_type: str | None = None
+    win_rate: float | None = None
+    avg_diff: int | None = None
+    n_days: int | None = None
     tags: list[str] = []
     is_fixed6: bool = False
     is_small_model: bool = False
 
 
 class PredictionPayload(BaseModel):
-    number: int
-    total: int
-    tier: str
-    day_label: str
-    event_n: int
+    source: str = "simulator"  # "simulator" | "chat"
+    number: int | None = None
+    total: int | None = None
+    tier: str | None = None
+    day_label: str | None = None
+    event_n: int | None = None
     recommendations: list[RecommendationIn]
 
 
@@ -98,7 +99,7 @@ def _reconcile(entry: dict, df) -> dict:
 
 @router.post("/predictions")
 def save_prediction(payload: PredictionPayload):
-    """今日のシミュレーター推奨結果を保存する。"""
+    """今日の推奨結果を保存する（シミュレーター/ナナのチャット両対応）。"""
     today = date.today().isoformat()
     data = _load()
     entries = data.setdefault(today, [])
@@ -107,6 +108,7 @@ def save_prediction(payload: PredictionPayload):
         "id": uuid4().hex[:8],
         "date": today,
         "saved_at": datetime.now().isoformat(timespec="minutes"),
+        "source": payload.source,
         "number": payload.number,
         "total": payload.total,
         "tier": payload.tier,
