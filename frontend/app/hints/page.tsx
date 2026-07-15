@@ -5,7 +5,7 @@ import axios from "axios";
 import { API } from "../lib/api";
 import PageHeader from "../components/PageHeader";
 
-type Hints = {
+interface Hints {
   date: string;
   store_post: string;
   cocochi: string;
@@ -13,7 +13,7 @@ type Hints = {
   saved_at: string | null;
   has_store_images: boolean;
   has_cocochi_images: boolean;
-};
+}
 
 function useImageList(initial: string[] = []) {
   const [images, setImages] = useState<string[]>(initial);
@@ -245,7 +245,6 @@ function ImageDropZone({
         <div className="p-2 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
           {images.map((src, i) => (
             <div key={i} className="relative group">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={src} alt="" className="h-20 w-auto rounded border border-gray-200 object-cover" />
               <button
                 onClick={() => onRemove(i)}

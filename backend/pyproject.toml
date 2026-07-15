@@ -24,6 +24,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "tests/*" = ["S101", "E402"]  # テストでのassert使用とパス設定後のimportを許可
+"main.py" = ["E402"]  # load_dotenv()を各routerのimportより前に呼ぶ必要があるため
 
 # isort の設定
 [tool.ruff.lint.isort]

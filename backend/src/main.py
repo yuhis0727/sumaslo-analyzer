@@ -6,12 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
-from src.app.api.endpoints.health_check import health_check
-from src.app.api.endpoints.csv_data import router as csv_router
 from src.app.api.endpoints.ai_chat import router as ai_router
-from src.app.api.endpoints.simulator import router as simulator_router
+from src.app.api.endpoints.csv_data import router as csv_router
+from src.app.api.endpoints.health_check import health_check
 from src.app.api.endpoints.hints import router as hints_router
 from src.app.api.endpoints.predictions import router as predictions_router
+from src.app.api.endpoints.simulator import router as simulator_router
 from src.app.services.scheduler import start_scheduler, stop_scheduler
 
 

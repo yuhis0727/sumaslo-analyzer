@@ -36,7 +36,9 @@ def _load() -> dict:
 
 def _save(data: dict) -> None:
     Path(PREDICTIONS_PATH).parent.mkdir(parents=True, exist_ok=True)
-    Path(PREDICTIONS_PATH).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    Path(PREDICTIONS_PATH).write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 class RecommendationIn(BaseModel):

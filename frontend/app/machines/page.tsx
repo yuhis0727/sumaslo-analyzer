@@ -10,7 +10,7 @@ import { ResponsiveTable } from "../components/ResponsiveTable";
 import { API } from "../lib/api";
 import { diffStr, diffColor } from "../lib/format";
 
-type Machine = {
+interface Machine {
   machine_number: number;
   model_name: string;
   machine_type: MachineType;
@@ -18,7 +18,7 @@ type Machine = {
   avg_diff: number;
   total_diff: number;
   n_days: number;
-};
+}
 
 export default function MachinesPage() {
   const [mode, setMode] = useState<FilterMode>("n");

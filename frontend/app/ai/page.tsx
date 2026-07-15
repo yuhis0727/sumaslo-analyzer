@@ -6,16 +6,16 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { API } from "../lib/api";
 
-type Message = {
+interface Message {
   role: "user" | "assistant";
   text: string;
-};
+}
 
-type PickItem = {
+interface PickItem {
   machine_number: number;
   model_name: string;
   reason: string;
-};
+}
 
 const PICKS_START = "===PICKS===";
 const PICKS_END = "===END_PICKS===";

@@ -8,46 +8,46 @@ import { ResponsiveTable } from "../../components/ResponsiveTable";
 import { API } from "../../lib/api";
 import { diffStr, diffColor } from "../../lib/format";
 
-type EventMeta = {
+interface EventMeta {
   event_name: string;
   note: string;
   total_dates: number;
   dates_in_data: number;
   dates: string[];
-};
+}
 
-type DateSummary = {
+interface DateSummary {
   date: string;
   day_of_week: string;
   total_machines: number;
   plus_machines: number;
   positive_rate: number;
   avg_diff: number;
-};
+}
 
-type ModelRank = {
+interface ModelRank {
   model_name: string;
   n_days: number;
   win_rate: number;
   avg_diff: number;
-};
+}
 
-type MachineRank = {
+interface MachineRank {
   machine_number: number;
   model_name: string;
   n_days: number;
   win_rate: number;
   avg_diff: number;
-};
+}
 
-type EventAnalysis = {
+interface EventAnalysis {
   event_name: string;
   note: string;
   dates_summary: DateSummary[];
   top_models: ModelRank[];
   top_machines: MachineRank[];
   overall_avg_diff: number;
-};
+}
 
 type Tab = "dates" | "models" | "machines";
 

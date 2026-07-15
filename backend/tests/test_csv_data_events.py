@@ -7,7 +7,6 @@ from __future__ import annotations
 import csv
 import os
 import sys
-import tempfile
 
 import pytest
 from fastapi.testclient import TestClient
@@ -23,7 +22,6 @@ def csv_file(tmp_path_factory):
     tmp = tmp_path_factory.mktemp("data")
     path = tmp / "machines.csv"
 
-    rows = []
     # ニャンギラス日: 2026-01-11, 2026-01-21
     # 大田区活性化: 2026-01-30
     # ファン感謝デー: 2026-02-13, 2026-02-14
@@ -58,7 +56,9 @@ def csv_file(tmp_path_factory):
 
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
-        writer.writerow(["date", "machine_number", "model_name", "total_diff", "game_count", "rate"])
+        writer.writerow(
+            ["date", "machine_number", "model_name", "total_diff", "game_count", "rate"]
+        )
         for d, num, model, diff, game in dates_machines:
             rate = round(diff / game, 3) if game else 0
             writer.writerow([d, num, model, diff, game, rate])
@@ -71,6 +71,7 @@ def client(csv_file):
     os.environ["MACHINES_CSV"] = csv_file
     # lru_cache をクリアしてから import
     import importlib
+
     import app.api.endpoints.csv_data as mod
     mod._load_df.cache_clear()
     importlib.reload(mod)

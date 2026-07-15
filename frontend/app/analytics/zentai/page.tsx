@@ -9,7 +9,7 @@ import { ResponsiveTable } from "../../components/ResponsiveTable";
 import { API } from "../../lib/api";
 import { diffStr, diffColor } from "../../lib/format";
 
-type ModelScore = {
+interface ModelScore {
   model_name: string;
   machine_count: number;
   total_event_days: number;
@@ -19,9 +19,9 @@ type ModelScore = {
   avg_all_diff: number;
   recent_zentai_3: number;
   score: number;
-};
+}
 
-type ZentaiHistory = {
+interface ZentaiHistory {
   date: string;
   event_n: number;
   model_name: string;
@@ -29,7 +29,7 @@ type ZentaiHistory = {
   plus_machines: number;
   positive_rate: number;
   avg_diff: number;
-};
+}
 
 type Tab = "score" | "history";
 

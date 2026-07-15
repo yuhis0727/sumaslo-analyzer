@@ -7,7 +7,7 @@ import { MachineType, TypeBadge } from "../../components/Badges";
 import PageHeader from "../../components/PageHeader";
 import { API } from "../../lib/api";
 
-type ModelRow = {
+interface ModelRow {
   model_name: string;
   machine_type: MachineType;
   current_count: number;
@@ -18,13 +18,13 @@ type ModelRow = {
   full_rate: number;
   avg_positive: number;
   pattern: string;
-};
+}
 
-type Response = {
+interface Response {
   small: ModelRow[];
   medium: ModelRow[];
   large: ModelRow[];
-};
+}
 
 const PATTERN_STYLE: Record<string, string> = {
   "全台系濃厚":   "bg-green-100 text-green-800 border-green-300",

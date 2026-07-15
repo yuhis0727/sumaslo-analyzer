@@ -8,7 +8,7 @@ import { MachineType, TypeBadge } from "../components/Badges";
 import { LoadingState, ErrorAlert } from "../components/StateViews";
 import PageHeader from "../components/PageHeader";
 
-type Rec = {
+interface Rec {
   priority: number | null;
   machine_number: number;
   model_name: string;
@@ -22,9 +22,9 @@ type Rec = {
   is_small_model: boolean;
   actual_diff: number | null;
   hit: boolean | null;
-};
+}
 
-type Entry = {
+interface Entry {
   id: string;
   date: string;
   saved_at: string;
@@ -39,7 +39,7 @@ type Entry = {
   hit_rate: number | null;
   judged_count: number;
   total_count: number;
-};
+}
 
 const TIER_STYLE: Record<NonNullable<Entry["tier"]>, string> = {
   良番: "bg-green-500",

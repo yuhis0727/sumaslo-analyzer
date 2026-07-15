@@ -10,9 +10,16 @@ import pandas as pd
 from fastapi import APIRouter, Query
 
 from .csv_data import (
-    _event_days, _get_df, _model_type, _today_event_n, _today_events,
-    _current_model_map, _all_event_timestamps, _N_DAY_SET, EVENT_CALENDAR,
+    _N_DAY_SET,
+    EVENT_CALENDAR,
+    _all_event_timestamps,
+    _current_model_map,
+    _event_days,
     _filter_current_model_only,
+    _get_df,
+    _model_type,
+    _today_event_n,
+    _today_events,
 )
 
 router = APIRouter()
@@ -97,7 +104,8 @@ def recommend(
 
     fixed6 = _fixed6_machines(df, current)
 
-    latest_counts = df[df["date"] == latest_date].groupby("model_name")["machine_number"].count()
+    latest_today = df[df["date"] == latest_date]
+    latest_counts = latest_today.groupby("model_name")["machine_number"].count()
     small_models = set(latest_counts[latest_counts <= 4].index)
 
     # ── 推薦リスト構築 ──
@@ -128,10 +136,14 @@ def recommend(
             "is_small_model": r["model_name"] in small_models,
         })
 
-    top_all = mstats.sort_values(["win_rate", "avg_diff"], ascending=False)
-    top_a = mstats[mstats["machine_type"] == "A"].sort_values(["win_rate", "avg_diff"], ascending=False)
-    top_f6 = mstats[mstats["machine_number"].isin(fixed6)].sort_values("avg_diff", ascending=False)
-    top_small = mstats[mstats["model_name"].isin(small_models)].sort_values(["win_rate", "avg_diff"], ascending=False)
+    sort_cols = ["win_rate", "avg_diff"]
+    top_all = mstats.sort_values(sort_cols, ascending=False)
+    top_a = mstats[mstats["machine_type"] == "A"]
+    top_a = top_a.sort_values(sort_cols, ascending=False)
+    top_f6 = mstats[mstats["machine_number"].isin(fixed6)]
+    top_f6 = top_f6.sort_values("avg_diff", ascending=False)
+    top_small = mstats[mstats["model_name"].isin(small_models)]
+    top_small = top_small.sort_values(sort_cols, ascending=False)
 
     if tier == "良番":
         # 全種TOP → 固定6補完
@@ -162,20 +174,39 @@ def recommend(
 
     _DOW_SHIKAKE = {
         0: ("月", "列全", "島の全台に高設定。列ごと狙える番号なら列最良台を最優先。"),
-        1: ("火", "角系", "コーナー台（島端・角番台）に集中。角番台を台番実績と照合。"),
+        1: (
+            "火", "角系", "コーナー台（島端・角番台）に集中。角番台を台番実績と照合。",
+        ),
         2: ("水", "末尾", "台番末尾番台（X05・X10等）に集中。末尾一致台を優先。"),
-        3: ("木", "ランダム", "法則なし。データ実績台・固定設定6台を純粋に信頼。"),
-        4: ("金", "列一台以上", "各列に最低1台。列内最高実績台を押さえれば当たりやすい。"),
+        3: (
+            "木", "ランダム", "法則なし。データ実績台・固定設定6台を純粋に信頼。",
+        ),
+        4: (
+            "金", "列一台以上",
+            "各列に最低1台。列内最高実績台を押さえれば当たりやすい。",
+        ),
         5: ("土", "3台並び末尾起点", "島の末尾から3台連続。末尾3台セットで狙う。"),
-        6: ("日", "機種1以上・3台以上対象", "3台以上設置機種のうち各機種1台以上。少数台機種は除外。"),
+        6: (
+            "日", "機種1以上・3台以上対象",
+            "3台以上設置機種のうち各機種1台以上。少数台機種は除外。",
+        ),
     }
     dow = today.weekday()
     dow_label, dow_pattern, dow_hint = _DOW_SHIKAKE[dow]
 
     strategy_map = {
-        "良番": "最良ポジションを確保できる番号。本命機種の最高実績台を最優先で取りに行く。本命が埋まっていた場合の第2・第3候補も把握しておく。",
-        "中番": "本命は取れない前提で動く。固定設定6台と少数台全台系機種が主戦場。良番が流れた後の空きポジションを狙う。",
-        "悪番": "台番実績が信頼できるAタイプを最優先。固定設定6台は良番でも取られない場合がある。勝率重視で座る台を選ぶ。",
+        "良番": (
+            "最良ポジションを確保できる番号。本命機種の最高実績台を最優先で取りに行く。"
+            "本命が埋まっていた場合の第2・第3候補も把握しておく。"
+        ),
+        "中番": (
+            "本命は取れない前提で動く。固定設定6台と少数台全台系機種が主戦場。"
+            "良番が流れた後の空きポジションを狙う。"
+        ),
+        "悪番": (
+            "台番実績が信頼できるAタイプを最優先。固定設定6台は良番でも取られない場合がある。"
+            "勝率重視で座る台を選ぶ。"
+        ),
     }
 
     return {

@@ -32,14 +32,17 @@ def _load() -> dict:
 
 def _save(data: dict) -> None:
     Path(HINTS_PATH).parent.mkdir(parents=True, exist_ok=True)
-    Path(HINTS_PATH).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    Path(HINTS_PATH).write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 class HintPayload(BaseModel):
     store_post: str = ""
     cocochi: str = ""
     openchat: str = ""
-    store_images: list[str] = []   # base64 文字列のリスト（data URL形式: "data:image/jpeg;base64,..."）
+    # base64文字列のリスト（data URL形式: "data:image/jpeg;base64,..."）
+    store_images: list[str] = []
     cocochi_images: list[str] = []
 
 
@@ -96,7 +99,8 @@ def save_today_hints(payload: HintPayload):
 
 
 def get_today_hints_context() -> tuple[str, list[dict]]:
-    """ai_chat.py から呼ばれる。(テキスト文字列, Claudeイメージブロックリスト) を返す。"""
+    """ai_chat.py から呼ばれる。
+    (テキスト文字列, Claudeイメージブロックリスト) を返す。"""
     today = date.today().isoformat()
     data = _load()
     entry = data.get(today, {})

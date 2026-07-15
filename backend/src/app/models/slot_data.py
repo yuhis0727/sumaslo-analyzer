@@ -2,13 +2,13 @@ from datetime import datetime
 
 from sqlalchemy import (
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
     Integer,
     String,
     Text,
-    Date,
 )
 from sqlalchemy.orm import relationship
 

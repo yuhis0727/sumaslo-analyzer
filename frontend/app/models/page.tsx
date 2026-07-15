@@ -10,7 +10,7 @@ import { ResponsiveTable } from "../components/ResponsiveTable";
 import { API } from "../lib/api";
 import { diffStr } from "../lib/format";
 
-type ModelStat = {
+interface ModelStat {
   model_name: string;
   machine_type: MachineType;
   n_machines: number;
@@ -18,7 +18,7 @@ type ModelStat = {
   avg_diff: number;
   n_days: number;
   monthly_avg: Record<string, number>;
-};
+}
 
 export default function ModelsPage() {
   const [mode, setMode] = useState<FilterMode>("n");
