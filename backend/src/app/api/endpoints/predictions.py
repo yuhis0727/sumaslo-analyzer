@@ -14,7 +14,7 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 
-from .csv_data import _get_df
+from .csv_data import _current_model_map, _get_df
 
 router = APIRouter()
 
@@ -101,10 +101,30 @@ def _reconcile(entry: dict, df) -> dict:
 
 @router.post("/predictions")
 def save_prediction(payload: PredictionPayload):
-    """今日の推奨結果を保存する（シミュレーター/ナナのチャット両対応）。"""
+    """今日の推奨結果を保存する（シミュレーター/ナナのチャット両対応）。
+
+    現在稼働していない台番（AIの誤認識・古いデータ等）は保存前に除外する。
+    """
     today = date.today().isoformat()
     data = _load()
     entries = data.setdefault(today, [])
+
+    df = _get_df()
+    valid_numbers = set(_current_model_map(df).keys())
+
+    all_recs = [r.model_dump() for r in payload.recommendations]
+    accepted = [r for r in all_recs if r["machine_number"] in valid_numbers]
+    rejected = [
+        r["machine_number"]
+        for r in all_recs
+        if r["machine_number"] not in valid_numbers
+    ]
+
+    if all_recs and not accepted:
+        raise HTTPException(
+            status_code=400,
+            detail="保存対象の台番がいずれも現在稼働中のデータと一致しませんでした",
+        )
 
     entry = {
         "id": uuid4().hex[:8],
@@ -116,13 +136,15 @@ def save_prediction(payload: PredictionPayload):
         "tier": payload.tier,
         "day_label": payload.day_label,
         "event_n": payload.event_n,
-        "recommendations": [r.model_dump() for r in payload.recommendations],
+        "recommendations": accepted,
         "note": "",
     }
     entries.append(entry)
     _save(data)
 
-    return _reconcile(entry, _get_df())
+    result = _reconcile(entry, df)
+    result["rejected_machine_numbers"] = rejected
+    return result
 
 
 @router.get("/predictions")
