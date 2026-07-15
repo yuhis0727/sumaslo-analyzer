@@ -4,14 +4,14 @@ export type FilterMode = "n" | "event" | "plain" | "all";
 export const EVENT_NAMES = ["ニャンギラス", "大田区活性化", "ファン感謝デー"] as const;
 export type EventName = typeof EVENT_NAMES[number];
 
-type Props = {
+interface Props {
   mode: FilterMode;
   n: number;
   event: EventName;
   onModeChange: (m: FilterMode) => void;
   onNChange: (n: number) => void;
   onEventChange: (e: EventName) => void;
-};
+}
 
 const LABEL: Record<FilterMode, string> = {
   n: "Nの日",

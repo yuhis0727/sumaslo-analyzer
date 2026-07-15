@@ -33,9 +33,8 @@ _scheduler = BackgroundScheduler(timezone="Asia/Tokyo")
 def _scrape_all_stores() -> None:
     """登録済み全店舗の前日データをスクレイピングする"""
     from src.app.models import SessionLocal
-    from src.app.models.slot_data import ScrapingLog, Store
+    from src.app.models.slot_data import Machine, ScrapingLog, Store
     from src.app.services.scraper import AnasloScraper
-    from src.app.models.slot_data import Machine
 
     db = SessionLocal()
     try:
@@ -121,7 +120,10 @@ def start_scheduler() -> None:
     )
 
     _scheduler.start()
-    print(f"[Scheduler] 起動完了 — 毎日 {UPDATE_HOUR:02d}:00 に自動スクレイピングを実行します")
+    print(
+        f"[Scheduler] 起動完了 — 毎日 {UPDATE_HOUR:02d}:00 に"
+        "自動スクレイピングを実行します"
+    )
 
 
 def stop_scheduler() -> None:

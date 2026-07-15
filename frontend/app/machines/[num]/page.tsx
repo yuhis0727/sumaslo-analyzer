@@ -12,11 +12,11 @@ import { API } from "../../lib/api";
 import { diffStr, diffColor } from "../../lib/format";
 
 type ViewMode = "all" | "n" | "event" | "plain";
-type Monthly = { month: string; avg_diff: number; win_rate: number; n: number };
-type EventStat = { n_days: number; win_rate: number; avg_diff: number };
-type DayRecord = { date: string; model_name: string; total_diff: number | null; game_count: number | null; day_of_week: string; day: number };
+interface Monthly { month: string; avg_diff: number; win_rate: number; n: number }
+interface EventStat { n_days: number; win_rate: number; avg_diff: number }
+interface DayRecord { date: string; model_name: string; total_diff: number | null; game_count: number | null; day_of_week: string; day: number }
 
-type Detail = {
+interface Detail {
   machine_number: number;
   machine_type: MachineType;
   model_name: string;
@@ -26,7 +26,7 @@ type Detail = {
   n_day_stats: Record<string, EventStat>;
   plain_stats: EventStat | null;
   records: DayRecord[];
-};
+}
 
 function buildQuery(mode: ViewMode, n: number, event: EventName): string {
   if (mode === "n") return `?n=${n}`;

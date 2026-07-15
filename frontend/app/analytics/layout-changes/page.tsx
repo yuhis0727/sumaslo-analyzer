@@ -6,13 +6,13 @@ import { ResponsiveTable } from "../../components/ResponsiveTable";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-type LayoutChange = {
+interface LayoutChange {
   machine_number: number;
   changed_date: string;
   prev_model: string;
   latest_model: string;
   days_since_change: number;
-};
+}
 
 export default function LayoutChangesPage() {
   const [data, setData] = useState<LayoutChange[]>([]);

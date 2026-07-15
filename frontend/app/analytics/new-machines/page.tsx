@@ -6,15 +6,15 @@ import { ResponsiveTable } from "../../components/ResponsiveTable";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-type WeeklyRow = {
+interface WeeklyRow {
   week: number;
   win_rate: number;
   avg_diff: number;
   vs_store: number;
   n: number;
-};
+}
 
-type NewMachineModel = {
+interface NewMachineModel {
   model_name: string;
   machine_type: "AT" | "A" | "BT";
   intro_date: string;
@@ -23,19 +23,19 @@ type NewMachineModel = {
   overall_win_rate: number;
   overall_avg_diff: number;
   weekly: WeeklyRow[];
-};
+}
 
-type WeeklyAgg = {
+interface WeeklyAgg {
   week: number;
   avg_diff: number;
   win_rate: number;
   n: number;
-};
+}
 
-type Response = {
+interface Response {
   models: NewMachineModel[];
   weekly_aggregate: WeeklyAgg[];
-};
+}
 
 const TYPE_LABEL: Record<string, string> = { AT: "AT", A: "A", BT: "BT" };
 const TYPE_COLOR: Record<string, string> = {
@@ -55,7 +55,7 @@ function WrCell({ value }: { value: number }) {
   return <span className={cls}>{pct}%</span>;
 }
 
-function WeekBadge({ wk, data }: { wk: number; data: WeeklyRow | undefined }) {
+function WeekBadge({ data }: { data: WeeklyRow | undefined }) {
   if (!data) return <td className="px-3 py-2 text-center text-gray-300 text-xs">—</td>;
   const bg =
     data.avg_diff >= 200 ? "bg-green-100" :
@@ -312,7 +312,7 @@ export default function NewMachinesPage() {
                       <td className="px-4 py-2.5 text-center"><WrCell value={m.overall_win_rate} /></td>
                       <td className="px-4 py-2.5 text-center font-mono text-xs"><DiffCell value={m.overall_avg_diff} /></td>
                       {WEEKS.map(w => (
-                        <WeekBadge key={w} wk={w} data={weekMap[w]} />
+                        <WeekBadge key={w} data={weekMap[w]} />
                       ))}
                     </tr>
                   );

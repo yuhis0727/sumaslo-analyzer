@@ -7,7 +7,7 @@ import { ResponsiveTable } from "../../components/ResponsiveTable";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-type FixedSix = {
+interface FixedSix {
   machine_number: number;
   model_name: string;
   win_rate_vs_model: number;
@@ -16,7 +16,7 @@ type FixedSix = {
   avg_day_deviation: number;
   consecutive_beat: number;
   n_days: number;
-};
+}
 
 export default function FixedSettingPage() {
   const [data, setData] = useState<FixedSix[]>([]);

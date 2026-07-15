@@ -9,22 +9,22 @@ import { WinBadge, DiffText, DowBadge } from "./components/Badges";
 import { LoadingState, ErrorAlert } from "./components/StateViews";
 import { ResponsiveTable } from "./components/ResponsiveTable";
 
-type MachinePick = {
+interface MachinePick {
   machine_number: number;
   model_name: string;
   win_rate: number;
   avg_diff: number;
   n_days: number;
-};
+}
 
-type ModelStat = {
+interface ModelStat {
   model_name: string;
   win_rate: number;
   avg_diff: number;
   n_days: number;
-};
+}
 
-type Summary = {
+interface Summary {
   today: string;
   day_of_week: string;
   event_n: number | null;
@@ -33,29 +33,29 @@ type Summary = {
   top_machines: MachinePick[];
   top_models: ModelStat[];
   message?: string;
-};
+}
 
-type RecentDay = {
+interface RecentDay {
   date: string;
   day_of_week: string;
   total_machines: number;
   win_machines: number;
   win_rate: number;
   avg_diff: number;
-};
+}
 
-type HintsToday = {
+interface HintsToday {
   store_post: string;
   cocochi: string;
   saved_at: string | null;
-};
+}
 
-type PredictionEntry = {
+interface PredictionEntry {
   id: string;
   hit_rate: number | null;
   judged_count: number;
   total_count: number;
-};
+}
 
 /** イベント日（7の日・ニャンギラス・月末大田区活性化）判定 */
 const isEventDay = (day: number) => [1, 7].includes(day % 10) || day === 30;

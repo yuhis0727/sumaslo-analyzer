@@ -7,7 +7,7 @@ import { diffStr } from "../lib/format";
 import { MachineType, TypeBadge } from "../components/Badges";
 import PageHeader from "../components/PageHeader";
 
-type Rec = {
+interface Rec {
   priority: number;
   machine_number: number;
   model_name: string;
@@ -19,9 +19,9 @@ type Rec = {
   tags: string[];
   is_fixed6: boolean;
   is_small_model: boolean;
-};
+}
 
-type Result = {
+interface Result {
   number: number;
   total: number;
   percentile: number;
@@ -36,7 +36,7 @@ type Result = {
   dow_pattern: string;
   dow_hint: string;
   recommendations: Rec[];
-};
+}
 
 const TIER_STYLE = {
   良番: { bg: "bg-green-500", text: "text-green-700", light: "bg-green-50 border-green-200" },

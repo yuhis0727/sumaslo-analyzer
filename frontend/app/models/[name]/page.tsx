@@ -8,17 +8,17 @@ import { MachineType, TypeBadge, WinBadge } from "../../components/Badges";
 import { API } from "../../lib/api";
 import { diffStr, diffColor } from "../../lib/format";
 
-type Monthly = { month: string; avg_diff: number; win_rate: number };
-type MachineStat = { machine_number: number; n_days: number; win_rate: number; avg_diff: number; total_diff: number };
+interface Monthly { month: string; avg_diff: number; win_rate: number }
+interface MachineStat { machine_number: number; n_days: number; win_rate: number; avg_diff: number; total_diff: number }
 
-type Detail = {
+interface Detail {
   model_name: string;
   machine_type: MachineType;
   machine_count: number;
   overall: { win_rate: number; avg_diff: number; total_diff: number };
   monthly: Monthly[];
   machines: MachineStat[];
-};
+}
 
 export default function ModelDetailPage() {
   const { name } = useParams<{ name: string }>();
