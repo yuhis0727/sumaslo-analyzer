@@ -3,6 +3,8 @@ services:
     build: 
       dockerfile: Dockerfile.prod
     command: python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8080
+    environment:
+      - TZ=Asia/Tokyo
     volumes:
       - ./backend/.flake8:/workspace/.flake8
       - ./backend/.env:/workspace/.env
