@@ -163,3 +163,36 @@ def update_prediction_note(target_date: str, entry_id: str, payload: NotePayload
             _save(data)
             return _reconcile(entry, _get_df())
     raise HTTPException(status_code=404, detail="予測エントリが見つかりません")
+
+
+def get_recent_summary(limit: int = 10) -> dict:
+    """ナナのチャットコンテキスト用: 直近の予測実績を軽量に要約する。"""
+    data = _load()
+    df = _get_df()
+    dates = sorted(data.keys(), reverse=True)[:limit]
+
+    entries = [_reconcile(e, df) for d in dates for e in data[d]]
+    entries.sort(key=lambda e: (e["date"], e["saved_at"]), reverse=True)
+
+    judged = [e for e in entries if e["hit_rate"] is not None]
+    overall_hit_rate = (
+        round(sum(e["hit_rate"] for e in judged) / len(judged), 4)
+        if judged else None
+    )
+
+    notes = [
+        {
+            "date": e["date"],
+            "tier": e.get("tier"),
+            "hit_rate": e["hit_rate"],
+            "note": e["note"],
+        }
+        for e in entries
+        if e.get("note")
+    ][:5]
+
+    return {
+        "judged_entries": len(judged),
+        "overall_hit_rate": overall_hit_rate,
+        "recent_notes": notes,
+    }
