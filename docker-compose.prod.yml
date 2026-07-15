@@ -13,6 +13,7 @@ services:
       - ./docker/scripts/:/workspace/scripts
     environment:
       - IS_PROD=True
+      - TZ=Asia/Tokyo
   db:
     image: mysql:8.0
     volumes:
