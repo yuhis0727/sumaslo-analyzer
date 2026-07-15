@@ -335,37 +335,37 @@ async def chat(req: ChatRequest):
         if m.role in ("user", "assistant")
     ]
 
-    # 示唆画像を会話の先頭に注入（履歴がない初回のみ、画像がある場合）
-    if not req.history:
-        try:
-            from .hints import get_today_hints_context
-            _, image_blocks = get_today_hints_context()
-            if image_blocks:
-                img_content: list[dict] = []
-                for blk in image_blocks:
-                    img_content.append({
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": blk["media_type"],
-                            "data": blk["data"],
-                        },
-                    })
-                    img_content.append({"type": "text", "text": f"↑ {blk['label']}"})
+    # 示唆画像を会話の先頭に注入。Claude APIはステートレスなため、
+    # 会話が続いても画像を参照できるよう履歴の有無にかかわらず毎ターン含める。
+    try:
+        from .hints import get_today_hints_context
+        _, image_blocks = get_today_hints_context()
+        if image_blocks:
+            img_content: list[dict] = []
+            for blk in image_blocks:
                 img_content.append({
-                    "type": "text",
-                    "text": (
-                        "上記は本日の示唆画像です。内容をすべて読み取り、"
-                        "今日の狙い台判断に最優先で使ってください。"
-                    ),
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": blk["media_type"],
+                        "data": blk["data"],
+                    },
                 })
-                messages.insert(0, {"role": "user", "content": img_content})
-                ack_text = (
-                    "示唆画像を確認しました。内容を読み取り、今日の立ち回りの参考にします。"
-                )
-                messages.insert(1, {"role": "assistant", "content": ack_text})
-        except Exception:
-            pass
+                img_content.append({"type": "text", "text": f"↑ {blk['label']}"})
+            img_content.append({
+                "type": "text",
+                "text": (
+                    "上記は本日の示唆画像です。内容をすべて読み取り、"
+                    "今日の狙い台判断に最優先で使ってください。"
+                ),
+            })
+            messages.insert(0, {"role": "user", "content": img_content})
+            ack_text = (
+                "示唆画像を確認しました。内容を読み取り、今日の立ち回りの参考にします。"
+            )
+            messages.insert(1, {"role": "assistant", "content": ack_text})
+    except Exception:
+        pass
 
     messages.append({"role": "user", "content": req.message})
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import axios from "axios";
+import Link from "next/link";
 import { API } from "../lib/api";
 import { diffStr } from "../lib/format";
 import { MachineType, TypeBadge } from "../components/Badges";
@@ -162,17 +163,25 @@ export default function SimulatorPage() {
                   </div>
                 </div>
               </div>
-              <button
-                onClick={savePrediction}
-                disabled={saving || saved}
-                className={`shrink-0 px-4 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${
-                  saved
-                    ? "bg-green-100 text-green-700"
-                    : "bg-brand text-white hover:bg-brand-light disabled:opacity-40"
-                }`}
-              >
-                {saved ? "保存済み" : saving ? "保存中..." : "この予測を保存"}
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Link
+                  href={`/ai?number=${result.number}&total=${result.total}`}
+                  className="px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  ナナに相談する
+                </Link>
+                <button
+                  onClick={savePrediction}
+                  disabled={saving || saved}
+                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${
+                    saved
+                      ? "bg-green-100 text-green-700"
+                      : "bg-brand text-white hover:bg-brand-light disabled:opacity-40"
+                  }`}
+                >
+                  {saved ? "保存済み" : saving ? "保存中..." : "この予測を保存"}
+                </button>
+              </div>
             </div>
             <p className="mt-3 text-sm text-gray-700 leading-relaxed">{result.strategy}</p>
           </div>

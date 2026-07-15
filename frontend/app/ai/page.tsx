@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -56,18 +57,33 @@ export default function AIPage() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [savedIndices, setSavedIndices] = useState<Set<number>>(new Set());
+  const [savedIndices, setSavedIndices] = useState<Map<number, number[]>>(new Map());
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
+  const [saveErrors, setSaveErrors] = useState<Map<number, string>>(new Map());
   const bottomRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
+
+  // シミュレーター結果からの遷移時、番号を下書きとして入力欄に入れる（自動送信はしない）
+  useEffect(() => {
+    const number = searchParams.get("number");
+    if (!number) return;
+    const total = searchParams.get("total");
+    setInput(`${number}番引いた${total ? `（${total}人中）` : ""}。今日の狙い台を教えて`);
+  }, [searchParams]);
 
   const savePicks = async (index: number, picks: PickItem[]) => {
     setSavingIndex(index);
+    setSaveErrors(prev => { const next = new Map(prev); next.delete(index); return next; });
     try {
-      await axios.post(`${API}/api/predictions`, {
+      const res = await axios.post(`${API}/api/predictions`, {
         source: "chat",
         recommendations: picks,
       });
-      setSavedIndices(prev => new Set(prev).add(index));
+      const rejected: number[] = res.data.rejected_machine_numbers ?? [];
+      setSavedIndices(prev => new Map(prev).set(index, rejected));
+    } catch (e) {
+      const detail = axios.isAxiosError(e) ? e.response?.data?.detail : undefined;
+      setSaveErrors(prev => new Map(prev).set(index, detail || "保存に失敗しました"));
     } finally {
       setSavingIndex(null);
     }
@@ -203,19 +219,31 @@ export default function AIPage() {
                   {!(loading && i === messages.length - 1) && (() => {
                     const picks = extractPicks(m.text);
                     if (!picks) return null;
-                    const saved = savedIndices.has(i);
+                    const rejected = savedIndices.get(i);
+                    const saved = rejected !== undefined;
+                    const error = saveErrors.get(i);
                     return (
-                      <button
-                        onClick={() => savePicks(i, picks)}
-                        disabled={saved || savingIndex === i}
-                        className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                          saved
-                            ? "bg-green-100 text-green-700"
-                            : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-                        }`}
-                      >
-                        {saved ? "保存済み" : savingIndex === i ? "保存中..." : "この回答を予測として保存"}
-                      </button>
+                      <div className="mt-2">
+                        <button
+                          onClick={() => savePicks(i, picks)}
+                          disabled={saved || savingIndex === i}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                            saved
+                              ? "bg-green-100 text-green-700"
+                              : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                          }`}
+                        >
+                          {saved ? "保存済み" : savingIndex === i ? "保存中..." : "この回答を予測として保存"}
+                        </button>
+                        {saved && rejected.length > 0 && (
+                          <p className="text-xs text-amber-600 mt-1">
+                            {rejected.join("・")}番は現在稼働していないため除外されました
+                          </p>
+                        )}
+                        {error && (
+                          <p className="text-xs text-red-500 mt-1">{error}</p>
+                        )}
+                      </div>
                     );
                   })()}
                   </>
