@@ -1,0 +1,21 @@
+FROM node:20.17.0
+
+WORKDIR /app
+
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+COPY . .
+
+# NEXT_PUBLIC_*はビルド時にバンドルへ埋め込まれるため、buildより前に受け取る
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_FAVICON_PATH
+ENV NEXT_PUBLIC_FAVICON_PATH=$NEXT_PUBLIC_FAVICON_PATH
+
+RUN yarn build
+
+ENV NODE_ENV=production
+EXPOSE 3000
+
+CMD ["yarn", "start"]

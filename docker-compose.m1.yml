@@ -7,24 +7,9 @@ services:
     volumes:
       - ./backend/.flake8:/workspace/.flake8
       - ./backend/.env:/workspace/.env
-      - ./backend/alembic.ini.dev:/workspace/alembic.ini
-      - ./backend/alembic:/workspace/alembic:consistent
       - ./backend/src/:/workspace/src:consistent
       - ./backend/tests/:/workspace/tests:consistent
       - ./docker/scripts/:/workspace/scripts
-  db:
-    image: mysql:8.0
-    volumes:
-      - db-store:/var/lib/mysql  # MySQLデータを永続化するためのボリューム
-      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
-    environment:
-      - MYSQL_DATABASE=
-      - MYSQL_USER=db-user
-      - MYSQL_PASSWORD=db-pass
-      - MYSQL_ROOT_PASSWORD=password
-      - TZ=Asia/Tokyo
-    ports:
-      - 13306:3306
 
   web:
     image: node:20.17.0
@@ -50,6 +35,4 @@ services:
     environment:
       - NODE_ENV=development
 volumes:
-  db-store:
-    driver: local
   node_modules:

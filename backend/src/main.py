@@ -1,5 +1,3 @@
-from contextlib import asynccontextmanager
-
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,16 +10,6 @@ from src.app.api.endpoints.health_check import health_check
 from src.app.api.endpoints.hints import router as hints_router
 from src.app.api.endpoints.predictions import router as predictions_router
 from src.app.api.endpoints.simulator import router as simulator_router
-from src.app.services.scheduler import start_scheduler, stop_scheduler
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """アプリ起動・終了時の処理"""
-    start_scheduler()
-    yield
-    stop_scheduler()
-
 
 app = FastAPI(
     title="Sumaslo Analyzer",
@@ -29,7 +17,6 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    lifespan=lifespan,
 )
 
 # CORSミドルウェアの追加
