@@ -25,29 +25,50 @@ export default function ModelDetailPage() {
   const modelName = decodeURIComponent(name);
   const [data, setData] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [startDate, setStartDate] = useState("");
 
   useEffect(() => {
-    axios.get<Detail>(`${API}/api/data/model/${encodeURIComponent(modelName)}`)
+    setLoading(true);
+    const q = startDate ? `?start_date=${startDate}` : "";
+    axios.get<Detail>(`${API}/api/data/model/${encodeURIComponent(modelName)}${q}`)
       .then(r => setData(r.data))
       .finally(() => setLoading(false));
-  }, [modelName]);
+  }, [modelName, startDate]);
 
   if (loading) return <div className="py-16 text-center text-gray-400">読み込み中...</div>;
   if (!data) return <div className="py-16 text-center text-red-500">機種が見つかりません</div>;
 
   const maxAbsDiff = Math.max(...data.monthly.map(m => Math.abs(m.avg_diff)), 1);
+  const periodLabel = startDate ? `${startDate}〜` : "全期間";
 
   return (
     <div className="space-y-6">
       {/* ヘッダー */}
-      <div className="flex items-start gap-4">
-        <Link href="/models" className="text-gray-400 hover:text-gray-600 mt-1">← 機種一覧</Link>
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+        <Link href="/models" className="text-gray-400 hover:text-gray-600 mt-1 shrink-0">← 機種一覧</Link>
+        <div className="flex-1">
           <div className="flex items-center gap-3">
             <div className="text-2xl font-bold text-gray-900">{data.model_name}</div>
             <TypeBadge type={data.machine_type} />
           </div>
           <div className="text-sm text-gray-500 mt-0.5">{data.machine_count}台設置</div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-sm text-gray-500 shrink-0">集計開始日:</span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="border border-gray-300 rounded px-2 py-1.5 text-sm"
+          />
+          {startDate && (
+            <button
+              onClick={() => setStartDate("")}
+              className="text-xs text-brand hover:underline whitespace-nowrap"
+            >
+              クリア
+            </button>
+          )}
         </div>
       </div>
 
@@ -68,7 +89,7 @@ export default function ModelDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* 月別バーチャート */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="font-semibold text-gray-700 mb-4">月別平均差枚（機種全体）</h2>
+          <h2 className="font-semibold text-gray-700 mb-4">月別平均差枚（機種全体・{periodLabel}）</h2>
           <div className="space-y-2">
             {data.monthly.map(m => {
               const pct = (Math.abs(m.avg_diff) / maxAbsDiff) * 100;

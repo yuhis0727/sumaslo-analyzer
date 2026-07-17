@@ -27,21 +27,24 @@ export default function ModelsPage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [models, setModels] = useState<ModelStat[]>([]);
   const [loading, setLoading] = useState(false);
+  const [startDate, setStartDate] = useState("");
 
-  const fetch = (m: FilterMode, nVal: number, ev: EventName) => {
+  const fetch = (m: FilterMode, nVal: number, ev: EventName, sd: string) => {
     setLoading(true);
     const p = m === "n" ? `n=${nVal}` : m === "event" ? `event=${encodeURIComponent(ev)}` : `plain=true`;
+    const sdParam = sd ? `&start_date=${sd}` : "";
     axios
-      .get<ModelStat[]>(`${API}/api/data/models?${p}`)
+      .get<ModelStat[]>(`${API}/api/data/models?${p}${sdParam}`)
       .then((r) => setModels(r.data))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetch(mode, n, event); }, []);
+  useEffect(() => { fetch(mode, n, event, startDate); }, []);
 
-  const handleMode = (m: FilterMode) => { setMode(m); fetch(m, n, event); };
-  const handleN = (v: number) => { setN(v); fetch(mode, v, event); };
-  const handleEvent = (e: EventName) => { setEvent(e); fetch(mode, n, e); };
+  const handleMode = (m: FilterMode) => { setMode(m); fetch(m, n, event, startDate); };
+  const handleN = (v: number) => { setN(v); fetch(mode, v, event, startDate); };
+  const handleEvent = (e: EventName) => { setEvent(e); fetch(mode, n, e, startDate); };
+  const handleStartDate = (v: string) => { setStartDate(v); fetch(mode, n, event, v); };
 
   const modeLabel = mode === "n" ? `${n}の日` : event;
   const filtered = typeFilter === "all" ? models : models.filter(m => m.machine_type === typeFilter);
@@ -57,7 +60,26 @@ export default function ModelsPage() {
         />
       </div>
 
-      <TypeFilterTabs value={typeFilter} onChange={setTypeFilter} allLabel="全機種" />
+      <div className="flex flex-wrap items-center gap-4">
+        <TypeFilterTabs value={typeFilter} onChange={setTypeFilter} allLabel="全機種" />
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-500 shrink-0">集計開始日:</span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => handleStartDate(e.target.value)}
+            className="border border-gray-300 rounded px-2 py-1.5 text-sm"
+          />
+          {startDate && (
+            <button
+              onClick={() => handleStartDate("")}
+              className="text-xs text-brand hover:underline"
+            >
+              クリア（全期間に戻す）
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 text-sm text-gray-400">
