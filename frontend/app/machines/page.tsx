@@ -31,7 +31,9 @@ export default function MachinesPage() {
   const [search, setSearch] = useState("");
 
   const buildParams = (m: FilterMode, nVal: number, ev: EventName, min: number) => {
-    const p = new URLSearchParams({ min_days: String(min), limit: "300" });
+    // 台番/機種名の検索は取得後にクライアント側で絞り込むため、
+    // 店舗の総台数(715台)を上回る上限を指定して取りこぼしを防ぐ
+    const p = new URLSearchParams({ min_days: String(min), limit: "800" });
     if (m === "n") p.set("n", String(nVal));
     else if (m === "event") p.set("event", ev);
     else if (m === "plain") p.set("plain", "true");

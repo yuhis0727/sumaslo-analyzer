@@ -281,7 +281,7 @@ def get_machines(
     plain: bool = Query(False),
     all_days: bool = Query(False),
     min_days: int = Query(5, ge=1),
-    limit: int = Query(100, le=500),
+    limit: int = Query(100, le=1000),
 ):
     """Nの日/イベント日/平常日/全期間の台番別勝率一覧。"""
     if n is None and event is None and not plain and not all_days:
