@@ -9,24 +9,11 @@ services:
     volumes:
       - ./backend/.flake8:/workspace/.flake8
       - ./backend/.env:/workspace/.env
-      - ./backend/alembic.ini.dev:/workspace/alembic.ini
-      - ./backend/alembic:/workspace/alembic:consistent
       - ./backend/src/:/workspace/src:consistent
       - ./backend/tests/:/workspace/tests:consistent
       - ./backend/pyproject.toml:/workspace/pyproject.toml
       - ./docker/scripts/:/workspace/scripts
       - ./minrepo_maruhan_kamata7_browser.csv:/workspace/data/machines.csv:ro
-  db:
-    image: postgres:15
-    volumes:
-      - db-store:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=sumaslo
-      - POSTGRES_USER=db-user
-      - POSTGRES_PASSWORD=db-pass
-      - TZ=Asia/Tokyo
-    ports:
-      - 15432:5432
 
   web:
     image: node:20.17.0
@@ -55,6 +42,4 @@ services:
     environment:
       - NODE_ENV=development
 volumes:
-  db-store:
-    driver: local
   node_modules:
