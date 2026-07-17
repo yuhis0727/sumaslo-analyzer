@@ -29,8 +29,9 @@ export default function MachinesPage() {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [startDate, setStartDate] = useState("");
 
-  const buildParams = (m: FilterMode, nVal: number, ev: EventName, min: number) => {
+  const buildParams = (m: FilterMode, nVal: number, ev: EventName, min: number, sd: string) => {
     // 台番/機種名の検索は取得後にクライアント側で絞り込むため、
     // 店舗の総台数(715台)を上回る上限を指定して取りこぼしを防ぐ
     const p = new URLSearchParams({ min_days: String(min), limit: "800" });
@@ -38,23 +39,25 @@ export default function MachinesPage() {
     else if (m === "event") p.set("event", ev);
     else if (m === "plain") p.set("plain", "true");
     else p.set("all_days", "true");
+    if (sd) p.set("start_date", sd);
     return p.toString();
   };
 
-  const fetch = (m: FilterMode, nVal: number, ev: EventName, min: number) => {
+  const fetch = (m: FilterMode, nVal: number, ev: EventName, min: number, sd: string) => {
     setLoading(true);
     axios
-      .get<Machine[]>(`${API}/api/data/machines?${buildParams(m, nVal, ev, min)}`)
+      .get<Machine[]>(`${API}/api/data/machines?${buildParams(m, nVal, ev, min, sd)}`)
       .then((r) => setMachines(r.data))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetch(mode, n, event, minDays); }, []);
+  useEffect(() => { fetch(mode, n, event, minDays, startDate); }, []);
 
-  const handleMode = (m: FilterMode) => { setMode(m); fetch(m, n, event, minDays); };
-  const handleN = (v: number) => { setN(v); fetch(mode, v, event, minDays); };
-  const handleEvent = (e: EventName) => { setEvent(e); fetch(mode, n, e, minDays); };
-  const handleMinDays = (v: number) => { setMinDays(v); fetch(mode, n, event, v); };
+  const handleMode = (m: FilterMode) => { setMode(m); fetch(m, n, event, minDays, startDate); };
+  const handleN = (v: number) => { setN(v); fetch(mode, v, event, minDays, startDate); };
+  const handleEvent = (e: EventName) => { setEvent(e); fetch(mode, n, e, minDays, startDate); };
+  const handleMinDays = (v: number) => { setMinDays(v); fetch(mode, n, event, v, startDate); };
+  const handleStartDate = (v: string) => { setStartDate(v); fetch(mode, n, event, minDays, v); };
 
   const filtered = machines.filter(
     (m) =>
@@ -104,6 +107,24 @@ export default function MachinesPage() {
             className="border border-gray-300 rounded px-3 py-1.5 text-sm flex-1 md:w-52"
           />
         </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-gray-500 shrink-0">集計開始日:</span>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => handleStartDate(e.target.value)}
+          className="border border-gray-300 rounded px-2 py-1.5 text-sm"
+        />
+        {startDate && (
+          <button
+            onClick={() => handleStartDate("")}
+            className="text-xs text-brand hover:underline"
+          >
+            クリア（全期間に戻す）
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">

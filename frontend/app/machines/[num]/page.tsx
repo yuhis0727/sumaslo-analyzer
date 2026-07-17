@@ -28,11 +28,14 @@ interface Detail {
   records: DayRecord[];
 }
 
-function buildQuery(mode: ViewMode, n: number, event: EventName): string {
-  if (mode === "n") return `?n=${n}`;
-  if (mode === "event") return `?event=${encodeURIComponent(event)}`;
-  if (mode === "plain") return `?plain=true`;
-  return "";
+function buildQuery(mode: ViewMode, n: number, event: EventName, startDate: string): string {
+  const p = new URLSearchParams();
+  if (mode === "n") p.set("n", String(n));
+  else if (mode === "event") p.set("event", event);
+  else if (mode === "plain") p.set("plain", "true");
+  if (startDate) p.set("start_date", startDate);
+  const qs = p.toString();
+  return qs ? `?${qs}` : "";
 }
 
 const MODE_LABELS: Record<ViewMode, string> = {
@@ -50,20 +53,22 @@ export default function MachineDetailPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("all");
   const [viewN, setViewN] = useState(7);
   const [viewEvent, setViewEvent] = useState<EventName>("ニャンギラス");
+  const [startDate, setStartDate] = useState("");
 
-  const fetchData = (mode: ViewMode, n: number, ev: EventName) => {
+  const fetchData = (mode: ViewMode, n: number, ev: EventName, sd: string) => {
     setLoading(true);
-    const q = buildQuery(mode, n, ev);
+    const q = buildQuery(mode, n, ev, sd);
     axios.get<Detail>(`${API}/api/data/machine/${num}${q}`)
       .then(r => setData(r.data))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(viewMode, viewN, viewEvent); }, [num]);
+  useEffect(() => { fetchData(viewMode, viewN, viewEvent, startDate); }, [num]);
 
-  const handleMode = (m: ViewMode) => { setViewMode(m); fetchData(m, viewN, viewEvent); };
-  const handleN = (v: number) => { setViewN(v); fetchData("n", v, viewEvent); };
-  const handleEvent = (e: EventName) => { setViewEvent(e); fetchData("event", viewN, e); };
+  const handleMode = (m: ViewMode) => { setViewMode(m); fetchData(m, viewN, viewEvent, startDate); };
+  const handleN = (v: number) => { setViewN(v); fetchData("n", v, viewEvent, startDate); };
+  const handleEvent = (e: EventName) => { setViewEvent(e); fetchData("event", viewN, e, startDate); };
+  const handleStartDate = (v: string) => { setStartDate(v); fetchData(viewMode, viewN, viewEvent, v); };
 
   if (!data && !loading) return <div className="py-16 text-center text-red-500">データが見つかりません</div>;
 
@@ -77,6 +82,7 @@ export default function MachineDetailPage() {
   }] : [];
 
   const modeLabel = viewMode === "n" ? `${viewN}の日` : viewMode === "event" ? viewEvent : MODE_LABELS[viewMode];
+  const periodLabel = startDate ? `${startDate}〜` : "全期間";
 
   return (
     <div className="space-y-6">
@@ -141,6 +147,24 @@ export default function MachineDetailPage() {
         {viewMode === "plain" && (
           <span className="text-xs text-gray-400">Nの日・イベント日以外（10日・20日・非イベント30/31日）</span>
         )}
+
+        <div className="flex items-center gap-2 md:ml-auto">
+          <span className="text-sm text-gray-500 shrink-0">集計開始日:</span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => handleStartDate(e.target.value)}
+            className="border border-gray-300 rounded px-2 py-1.5 text-sm"
+          />
+          {startDate && (
+            <button
+              onClick={() => handleStartDate("")}
+              className="text-xs text-brand hover:underline whitespace-nowrap"
+            >
+              クリア（全期間に戻す）
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -203,7 +227,7 @@ export default function MachineDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {/* 月別差枚バーチャート（全期間固定） */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="font-semibold text-gray-700 mb-1">月別平均差枚 <span className="text-xs font-normal text-gray-400">（全期間）</span></h2>
+              <h2 className="font-semibold text-gray-700 mb-1">月別平均差枚 <span className="text-xs font-normal text-gray-400">（{periodLabel}）</span></h2>
               <div className="space-y-2 mt-3">
                 {data.monthly.map(m => {
                   const pct = (Math.abs(m.avg_diff) / maxAbsDiff) * 100;
@@ -227,7 +251,7 @@ export default function MachineDetailPage() {
             <div className="space-y-4">
               {(Object.keys(data.event_stats).length > 0 || data.plain_stats) && (
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <h2 className="font-semibold text-gray-700 mb-1">イベント別 <span className="text-xs font-normal text-gray-400">（全期間・参照）</span></h2>
+                  <h2 className="font-semibold text-gray-700 mb-1">イベント別 <span className="text-xs font-normal text-gray-400">（{periodLabel}・参照）</span></h2>
                   <table className="w-full text-sm mt-2">
                     <thead className="text-xs text-gray-500">
                       <tr><th className="text-left pb-2">日種別</th><th className="text-right pb-2">回数</th><th className="text-right pb-2">勝率</th><th className="text-right pb-2">平均差枚</th></tr>
@@ -255,7 +279,7 @@ export default function MachineDetailPage() {
               )}
 
               <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h2 className="font-semibold text-gray-700 mb-1">Nの日別 <span className="text-xs font-normal text-gray-400">（全期間・参照）</span></h2>
+                <h2 className="font-semibold text-gray-700 mb-1">Nの日別 <span className="text-xs font-normal text-gray-400">（{periodLabel}・参照）</span></h2>
                 <table className="w-full text-sm mt-2">
                   <thead className="text-xs text-gray-500">
                     <tr><th className="text-left pb-2">N</th><th className="text-right pb-2">回数</th><th className="text-right pb-2">勝率</th><th className="text-right pb-2">平均差枚</th></tr>

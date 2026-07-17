@@ -181,6 +181,14 @@ def _filter_by_event_or_n(
     return df
 
 
+def _apply_start_date(df: pd.DataFrame, start_date: date | None) -> pd.DataFrame:
+    """集計開始日が指定されていれば、それ以降のデータのみに絞る。
+    「現在稼働中の台番/機種」の判定には使わず、統計計算対象のみに適用すること。"""
+    if start_date is None:
+        return df
+    return df[df["date"] >= pd.Timestamp(start_date)]
+
+
 # ── /api/data/reload ────────────────────────
 @router.post("/data/reload")
 def reload_csv():
@@ -282,6 +290,7 @@ def get_machines(
     all_days: bool = Query(False),
     min_days: int = Query(5, ge=1),
     limit: int = Query(100, le=1000),
+    start_date: date | None = Query(None, description="集計開始日(この日以降のみ集計)"),
 ):
     """Nの日/イベント日/平常日/全期間の台番別勝率一覧。"""
     if n is None and event is None and not plain and not all_days:
@@ -291,6 +300,7 @@ def get_machines(
         )
     df = _get_df()
     df_n = df.copy() if all_days else _filter_by_event_or_n(df, n, event, plain)
+    df_n = _apply_start_date(df_n, start_date)
     latest_date = df["date"].max()
     current_machines = set(df[df["date"] == latest_date]["machine_number"])
     model_map = _current_model_map(df)
@@ -334,6 +344,7 @@ def get_machine_history(
     n: int | None = Query(None, ge=1, le=9),
     event: str | None = Query(None),
     plain: bool = Query(False),
+    start_date: date | None = Query(None, description="集計開始日(この日以降のみ集計)"),
 ):
     """特定台番の履歴。n / event / plain で絞り込み可（省略時は全期間）。"""
     df = _get_df()
@@ -341,6 +352,7 @@ def get_machine_history(
     if sub.empty:
         raise HTTPException(status_code=404, detail="台番が見つかりません")
     sub = _filter_by_event_or_n(sub, n, event, plain)
+    sub = _apply_start_date(sub, start_date)
 
     records = []
     for _, r in sub.iterrows():
@@ -369,6 +381,7 @@ def get_machine_history(
     all_records = df[df["machine_number"] == machine_number].sort_values("date")
     # 現機種のデータのみ（統計用）
     current_records = all_records[all_records["model_name"] == current_model]
+    current_records = _apply_start_date(current_records, start_date)
 
     # フィルタ済みsub も現機種のみに絞る
     sub = sub[sub["model_name"] == current_model]
@@ -451,6 +464,7 @@ def get_models(
     n: int | None = Query(None, ge=1, le=9),
     event: str | None = Query(None),
     plain: bool = Query(False),
+    start_date: date | None = Query(None, description="集計開始日(この日以降のみ集計)"),
 ):
     """Nの日/イベント日/平常日の機種別勝率。n・event・plain のいずれかを指定。"""
     if n is None and event is None and not plain:
@@ -459,6 +473,7 @@ def get_models(
         )
     df = _get_df()
     df_n = _filter_by_event_or_n(df, n, event, plain)
+    df_n = _apply_start_date(df_n, start_date)
 
     stats = (
         df_n.groupby("model_name")
@@ -498,7 +513,10 @@ def get_models(
 
 # ── /api/data/model/{name} ────────────────────────
 @router.get("/data/model/{model_name}")
-def get_model_detail(model_name: str):
+def get_model_detail(
+    model_name: str,
+    start_date: date | None = Query(None, description="集計開始日(この日以降のみ集計)"),
+):
     """
     機種詳細。
     - 月別平均差枚（全月）
@@ -519,6 +537,7 @@ def get_model_detail(model_name: str):
     base = _filter_current_model_only(
         df[df["machine_number"].isin(current_machines)]
     ).copy()
+    base = _apply_start_date(base, start_date)
 
     # 月別平均差枚
     base["ym"] = base["date"].dt.to_period("M")
