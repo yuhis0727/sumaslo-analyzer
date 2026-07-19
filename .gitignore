@@ -16,7 +16,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+backend/lib/
 lib64/
 parts/
 sdist/
@@ -174,3 +174,4 @@ docs/ssl/
 *.key
 *.pub
 docker/nginx/ssl/
+.htpasswd
