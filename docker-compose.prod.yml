@@ -32,6 +32,7 @@ services:
       - "443:443"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:consistent
+      - ./docker/nginx/.htpasswd:/etc/nginx/.htpasswd:ro
       - ./docker/nginx/ssl:/etc/nginx/ssl
     depends_on:
       - web
