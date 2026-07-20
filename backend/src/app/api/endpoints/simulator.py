@@ -9,11 +9,12 @@ from datetime import date
 import pandas as pd
 from fastapi import APIRouter, Query
 
+from ... import stores
 from .csv_data import (
     _N_DAY_SET,
-    EVENT_CALENDAR,
     _all_event_timestamps,
     _current_model_map,
+    _event_calendar,
     _event_days,
     _filter_current_model_only,
     _get_df,
@@ -74,9 +75,10 @@ def recommend(
         base = df[df["date"].dt.day.isin(_event_days(event_n))]
         day_label = f"{event_n}の日"
     elif today_events:
+        calendar = _event_calendar()
         ev_dates: list = []
         for ev in today_events:
-            ev_dates.extend(pd.Timestamp(d) for d in EVENT_CALENDAR[ev]["dates"])
+            ev_dates.extend(pd.Timestamp(d) for d in calendar[ev]["dates"])
         base = df[df["date"].isin(ev_dates)]
         day_label = "・".join(today_events)
     else:
@@ -172,27 +174,14 @@ def recommend(
         for _, r in top_small.head(3).iterrows():
             push(r["machine_number"], "少数台全台系候補")
 
-    _DOW_SHIKAKE = {
-        0: ("月", "列全", "島の全台に高設定。列ごと狙える番号なら列最良台を最優先。"),
-        1: (
-            "火", "角系", "コーナー台（島端・角番台）に集中。角番台を台番実績と照合。",
-        ),
-        2: ("水", "末尾", "台番末尾番台（X05・X10等）に集中。末尾一致台を優先。"),
-        3: (
-            "木", "ランダム", "法則なし。データ実績台・固定設定6台を純粋に信頼。",
-        ),
-        4: (
-            "金", "列一台以上",
-            "各列に最低1台。列内最高実績台を押さえれば当たりやすい。",
-        ),
-        5: ("土", "3台並び末尾起点", "島の末尾から3台連続。末尾3台セットで狙う。"),
-        6: (
-            "日", "機種1以上・3台以上対象",
-            "3台以上設置機種のうち各機種1台以上。少数台機種は除外。",
-        ),
-    }
     dow = today.weekday()
-    dow_label, dow_pattern, dow_hint = _DOW_SHIKAKE[dow]
+    dow_shikake = stores.get_store().get("dow_shikake")
+    if dow_shikake:
+        dow_label, dow_pattern, dow_hint = dow_shikake[dow]
+    else:
+        dow_label = ["月", "火", "水", "木", "金", "土", "日"][dow]
+        dow_pattern = "未解明"
+        dow_hint = "この店舗の曜日仕掛けはまだ解明されていません。データ実績を優先。"
 
     strategy_map = {
         "良番": (

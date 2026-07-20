@@ -5,23 +5,19 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-router = APIRouter()
+from ... import stores
 
-HINTS_PATH = os.environ.get(
-    "HINTS_JSON",
-    str(Path(__file__).parents[4] / "data" / "hints.json"),
-)
+router = APIRouter()
 
 
 def _load() -> dict:
-    p = Path(HINTS_PATH)
+    p = Path(stores.hints_path())
     if not p.exists():
         return {}
     try:
@@ -31,8 +27,9 @@ def _load() -> dict:
 
 
 def _save(data: dict) -> None:
-    Path(HINTS_PATH).parent.mkdir(parents=True, exist_ok=True)
-    Path(HINTS_PATH).write_text(
+    p = Path(stores.hints_path())
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(
         json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 

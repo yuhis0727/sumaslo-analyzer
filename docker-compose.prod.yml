@@ -8,9 +8,13 @@ services:
     environment:
       - TZ=Asia/Tokyo
       - MACHINES_CSV=/workspace/machines.csv
+      - MACHINES_CSV_BIGDIPPER_TOGOSHIGINZA=/workspace/machines_bigdipper_togoshiginza.csv
     volumes:
       - ./backend/data:/workspace/data:consistent
       - ./minrepo_maruhan_kamata7_browser.csv:/workspace/machines.csv:ro
+      # 戸越銀座。VPSで初回デプロイ前に `touch minrepo_bigdipper_togoshiginza_browser.csv`
+      # しておくこと（ファイルが無いとDockerがディレクトリを作ってしまう）
+      - ./minrepo_bigdipper_togoshiginza_browser.csv:/workspace/machines_bigdipper_togoshiginza.csv:ro
     restart: unless-stopped
 
   web:

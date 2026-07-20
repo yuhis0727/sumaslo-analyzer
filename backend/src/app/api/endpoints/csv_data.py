@@ -4,7 +4,6 @@ DB不要・即動作
 """
 from __future__ import annotations
 
-import os
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
@@ -12,52 +11,25 @@ from pathlib import Path
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 
-router = APIRouter()
+from ... import stores
 
-CSV_PATH = os.environ.get(
-    "MACHINES_CSV",
-    str(Path(__file__).parents[4] / "data" / "machines.csv"),
-)
+router = APIRouter()
 
 DOW_JP = ["月", "火", "水", "木", "金", "土", "日"]
 
-# ── イベントカレンダー ────────────────────────
-EVENT_CALENDAR: dict[str, dict] = {
-    "ニャンギラス": {
-        "dates": [
-            "2026-01-01", "2026-01-11", "2026-01-21", "2026-01-31",
-            "2026-02-01", "2026-02-11", "2026-02-21",
-            "2026-03-01", "2026-03-11", "2026-03-21", "2026-03-31",
-            "2026-04-01", "2026-04-11", "2026-04-21",
-            "2026-05-01", "2026-05-11", "2026-05-21",
-            "2026-06-01", "2026-06-11", "2026-06-21",
-            "2026-07-01",
-        ],
-        "note": "1・11・21・31のつく日。毎月開催のレギュラーイベント。",
-    },
-    "大田区活性化": {
-        "dates": [
-            "2026-01-30", "2026-02-28", "2026-03-30", "2026-04-30", "2026-05-30",
-            "2026-06-13", "2026-06-30",
-        ],
-        "note": (
-            "月末30日開催。5月で一度終了し6/13に類似イベント再開、"
-            "6/30から元の形式に戻る。"
-        ),
-    },
-    "ファン感謝デー": {
-        "dates": [
-            "2026-02-13", "2026-02-14", "2026-02-15",
-            "2026-05-22", "2026-05-23", "2026-05-24",
-        ],
-        "note": "年2回の複数日開催。5/22はマルハン創業日。",
-    },
-}
+
+def _event_calendar() -> dict[str, dict]:
+    """現在の店舗のイベントカレンダー"""
+    return stores.event_calendar()
+
 
 def _today_events() -> list[str]:
     """今日開催のイベント名一覧"""
     today_str = date.today().isoformat()
-    return [name for name, meta in EVENT_CALENDAR.items() if today_str in meta["dates"]]
+    return [
+        name for name, meta in _event_calendar().items()
+        if today_str in meta["dates"]
+    ]
 
 
 # ── 機種タイプ判定 ────────────────────────
@@ -84,11 +56,20 @@ def _model_type(name: str) -> str:
     return "AT"
 
 
-@lru_cache(maxsize=1)
-def _load_df() -> pd.DataFrame:
-    if not Path(CSV_PATH).exists():
-        raise FileNotFoundError(f"CSV not found: {CSV_PATH}")
-    df = pd.read_csv(CSV_PATH, encoding="utf-8-sig")
+@lru_cache(maxsize=8)
+def _load_df(csv_path: str) -> pd.DataFrame:
+    p = Path(csv_path)
+    if not p.is_file() or p.stat().st_size == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=f"この店舗のデータがまだありません: {csv_path}",
+        )
+    df = pd.read_csv(csv_path, encoding="utf-8-sig")
+    if df.empty:
+        raise HTTPException(
+            status_code=404,
+            detail=f"この店舗のデータがまだありません: {csv_path}",
+        )
     df["date"] = pd.to_datetime(df["date"])
     df["total_diff"] = pd.to_numeric(df["total_diff"], errors="coerce")
     df["game_count"] = pd.to_numeric(df["game_count"], errors="coerce")
@@ -99,11 +80,14 @@ def _load_df() -> pd.DataFrame:
 
 
 def _get_df() -> pd.DataFrame:
+    csv_path = stores.csv_path()
     try:
-        return _load_df()
+        return _load_df(csv_path)
+    except HTTPException:
+        raise
     except Exception:
         _load_df.cache_clear()
-        return _load_df()
+        return _load_df(csv_path)
 
 
 def _event_days(n: int) -> list[int]:
@@ -150,7 +134,7 @@ _N_DAY_SET: frozenset[int] = (
 
 def _all_event_timestamps() -> set:
     ts: set = set()
-    for meta in EVENT_CALENDAR.values():
+    for meta in _event_calendar().values():
         ts.update(pd.Timestamp(d) for d in meta["dates"])
     return ts
 
@@ -164,11 +148,12 @@ def _filter_by_event_or_n(
     """event/n/plain のいずれかでフィルタ。
     plain=True: Nの日でもイベント日でもない平常日のみ残す。"""
     if event is not None:
-        if event not in EVENT_CALENDAR:
+        calendar = _event_calendar()
+        if event not in calendar:
             raise HTTPException(
                 status_code=400, detail=f"イベント '{event}' は登録されていません"
             )
-        event_dates = [pd.Timestamp(d) for d in EVENT_CALENDAR[event]["dates"]]
+        event_dates = [pd.Timestamp(d) for d in calendar[event]["dates"]]
         return df[df["date"].isin(event_dates)]
     if n is not None:
         return df[df["date"].dt.day.isin(_event_days(n))]
@@ -187,6 +172,13 @@ def _apply_start_date(df: pd.DataFrame, start_date: date | None) -> pd.DataFrame
     if start_date is None:
         return df
     return df[df["date"] >= pd.Timestamp(start_date)]
+
+
+# ── /api/stores ────────────────────────
+@router.get("/stores")
+def get_stores():
+    """店舗一覧（フロントの店舗切替UI用）"""
+    return stores.stores_meta()
 
 
 # ── /api/data/reload ────────────────────────
@@ -408,7 +400,7 @@ def get_machine_history(
 
     # イベント別集計（現機種のみ）
     event_stats = {}
-    for ev_name, meta in EVENT_CALENDAR.items():
+    for ev_name, meta in _event_calendar().items():
         ev_dates = [pd.Timestamp(d) for d in meta["dates"]]
         ev_sub = current_records[current_records["date"].isin(ev_dates)]
         if not ev_sub.empty:
@@ -678,7 +670,7 @@ def get_events():
     df = _get_df()
     csv_dates = set(df["date"].dt.strftime("%Y-%m-%d").unique())
     result = []
-    for name, meta in EVENT_CALENDAR.items():
+    for name, meta in _event_calendar().items():
         dates_in_csv = [d for d in meta["dates"] if d in csv_dates]
         result.append({
             "event_name": name,
@@ -697,7 +689,8 @@ def get_event_analysis(event: str = Query(...)):
     イベント別データ分析。
     各イベント日の店舗全体実績・機種別・台番別ランキングを返す。
     """
-    if event not in EVENT_CALENDAR:
+    calendar = _event_calendar()
+    if event not in calendar:
         raise HTTPException(
             status_code=404, detail=f"イベント '{event}' は登録されていません"
         )
@@ -707,7 +700,7 @@ def get_event_analysis(event: str = Query(...)):
     current_machines = set(df[df["date"] == latest_date]["machine_number"])
     model_map = _current_model_map(df)
 
-    event_dates_all = [pd.Timestamp(d) for d in EVENT_CALENDAR[event]["dates"]]
+    event_dates_all = [pd.Timestamp(d) for d in calendar[event]["dates"]]
     event_df = df[df["date"].isin(event_dates_all)]
 
     if event_df.empty:
@@ -800,7 +793,7 @@ def get_event_analysis(event: str = Query(...)):
 
     return {
         "event_name": event,
-        "note": EVENT_CALENDAR[event]["note"],
+        "note": calendar[event]["note"],
         "dates_summary": dates_summary,
         "top_models": top_models_list,
         "top_machines": top_machines_list,
