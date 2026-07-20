@@ -175,3 +175,4 @@ docs/ssl/
 *.pub
 docker/nginx/ssl/
 .htpasswd
+frontend/tsconfig.tsbuildinfo

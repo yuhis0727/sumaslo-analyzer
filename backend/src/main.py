@@ -10,6 +10,7 @@ from src.app.api.endpoints.health_check import health_check
 from src.app.api.endpoints.hints import router as hints_router
 from src.app.api.endpoints.predictions import router as predictions_router
 from src.app.api.endpoints.simulator import router as simulator_router
+from src.app.stores import store_middleware
 
 app = FastAPI(
     title="Sumaslo Analyzer",
@@ -34,6 +35,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 店舗切替ミドルウェア（?store= / X-Store ヘッダで店舗を解決）
+app.middleware("http")(store_middleware)
 
 # エンドポイントのルーティング
 app.include_router(health_check, prefix="/_health")

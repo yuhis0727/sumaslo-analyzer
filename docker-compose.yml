@@ -14,6 +14,9 @@ services:
       - ./backend/pyproject.toml:/workspace/pyproject.toml
       - ./docker/scripts/:/workspace/scripts
       - ./minrepo_maruhan_kamata7_browser.csv:/workspace/data/machines.csv:ro
+      # 戸越銀座。ファイルが無いとDockerがディレクトリを作ってしまうので
+      # 事前に `type nul >> minrepo_bigdipper_togoshiginza_browser.csv` 等で空ファイルを作ること
+      - ./minrepo_bigdipper_togoshiginza_browser.csv:/workspace/data/machines_bigdipper_togoshiginza.csv:ro
 
   web:
     image: node:20.17.0

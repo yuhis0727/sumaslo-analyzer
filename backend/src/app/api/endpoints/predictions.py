@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import date, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -14,18 +13,14 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 
+from ... import stores
 from .csv_data import _current_model_map, _get_df
 
 router = APIRouter()
 
-PREDICTIONS_PATH = os.environ.get(
-    "PREDICTIONS_JSON",
-    str(Path(__file__).parents[4] / "data" / "predictions.json"),
-)
-
 
 def _load() -> dict:
-    p = Path(PREDICTIONS_PATH)
+    p = Path(stores.predictions_path())
     if not p.exists():
         return {}
     try:
@@ -35,8 +30,9 @@ def _load() -> dict:
 
 
 def _save(data: dict) -> None:
-    Path(PREDICTIONS_PATH).parent.mkdir(parents=True, exist_ok=True)
-    Path(PREDICTIONS_PATH).write_text(
+    p = Path(stores.predictions_path())
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(
         json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 

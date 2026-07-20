@@ -2,7 +2,19 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import axios from 'axios';
 import './globals.css';
+import { API } from './lib/api';
+import {
+  DEFAULT_STORE_ID,
+  FALLBACK_STORES,
+  StoreInfo,
+  getStoreId,
+  installStoreInterceptor,
+  switchStore,
+} from './lib/store';
+
+installStoreInterceptor();
 
 /** 当日の立ち回り（入場〜着席の意思決定に使うページ） */
 const PRIMARY = [
@@ -30,6 +42,20 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [storeId, setStoreId] = useState(DEFAULT_STORE_ID);
+  const [storeList, setStoreList] = useState<StoreInfo[]>(FALLBACK_STORES);
+
+  // 店舗切替: localStorageの選択を反映し、店舗一覧をAPIから取得
+  useEffect(() => {
+    setStoreId(getStoreId());
+    axios
+      .get<StoreInfo[]>(`${API}/api/stores`)
+      .then((r) => setStoreList(r.data))
+      .catch(() => {});
+  }, []);
+
+  const currentStore =
+    storeList.find((s) => s.id === storeId) ?? FALLBACK_STORES[0];
 
   // ページ遷移でメニューを閉じる
   useEffect(() => {
@@ -55,14 +81,14 @@ export default function Layout({ children }: { children: ReactNode }) {
   return (
     <html lang="ja">
       <head>
-        <title>マルハン蒲田7 分析</title>
+        <title>{`${currentStore.short_name} 分析`}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body className="bg-gray-50 min-h-screen">
         <nav className="bg-brand text-white shadow-lg sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 flex items-center h-12">
             <Link href="/" className="font-bold text-base mr-6 whitespace-nowrap">
-              🎰 蒲田7分析
+              🎰 {currentStore.short_name}分析
             </Link>
 
             {/* デスクトップナビ */}
@@ -109,10 +135,25 @@ export default function Layout({ children }: { children: ReactNode }) {
               </div>
             </div>
 
+            {/* 店舗切替 */}
+            <select
+              value={storeId}
+              onChange={(e) => switchStore(e.target.value)}
+              className="ml-auto md:ml-2 bg-white/20 text-white text-xs rounded px-2 py-1 border border-white/30 focus:outline-none"
+              aria-label="店舗切替"
+            >
+              {storeList.map((s) => (
+                <option key={s.id} value={s.id} className="text-gray-900">
+                  {s.short_name}
+                  {s.has_data ? '' : '（データなし）'}
+                </option>
+              ))}
+            </select>
+
             {/* モバイル: ハンバーガー */}
             <button
               onClick={() => setMobileOpen((v) => !v)}
-              className="md:hidden ml-auto p-2 rounded hover:bg-white/20"
+              className="md:hidden ml-2 p-2 rounded hover:bg-white/20"
               aria-label="メニュー"
             >
               <span className="block w-5 space-y-1">

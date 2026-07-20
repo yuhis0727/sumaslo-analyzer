@@ -6,6 +6,7 @@ import axios from "axios";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { API } from "../lib/api";
+import { withStore } from "../lib/store";
 
 interface Message {
   role: "user" | "assistant";
@@ -52,7 +53,7 @@ export default function AIPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      text: "ナナです。マルハン蒲田7の立ち回りを担当します。\n抽選番号を引いた後に「○番引いた。今日のおすすめは？」と聞いてください。\n\n店長ポスト（X）の内容があれば一緒に貼ると精度が上がります。",
+      text: "ナナです。当店の立ち回りを担当します。\n抽選番号を引いた後に「○番引いた。今日のおすすめは？」と聞いてください。\n\n店長ポスト（X）の内容があれば一緒に貼ると精度が上がります。",
     },
   ]);
   const [input, setInput] = useState("");
@@ -106,7 +107,7 @@ export default function AIPage() {
     setLoading(true);
 
     try {
-      const resp = await fetch(`${API}/api/ai/chat`, {
+      const resp = await fetch(withStore(`${API}/api/ai/chat`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, history }),

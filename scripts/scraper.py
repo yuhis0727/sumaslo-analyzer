@@ -1,8 +1,13 @@
 """
-みんれぽ VPS用スクレイパー
+みんれぽ VPS用スクレイパー（複数店舗対応）
 - URLリスト収集: httpx（軽量・高速）
 - データ取得: Chromium + Xvfb（ベースページ→?kishu=allクリック）
 - Cloudflareなしなのでヘッドレスブラウザで問題なし
+
+使い方:
+  python scraper.py                        # 全店舗・直近7日分
+  python scraper.py bigdipper_togoshiginza # 指定店舗のみ
+  python scraper.py bigdipper_togoshiginza --start 2026-01-01  # 過去分バックフィル
 """
 import sys, io, re, csv, time, os, platform
 from datetime import date, timedelta
@@ -17,9 +22,27 @@ from selenium.webdriver.common.by import By
 # ------------------------------------------------------------------ #
 # 設定
 # ------------------------------------------------------------------ #
-STORE = "maruhan_kamata7"
-TAG_URL = "https://min-repo.com/tag/%e3%83%9e%e3%83%ab%e3%83%8f%e3%83%b3%e3%83%a1%e3%82%ac%e3%82%b7%e3%83%86%e3%82%a32000%e8%92%b2%e7%94%b07/"
-OUTPUT_CSV = f"minrepo_{STORE}_browser.csv"
+# 店舗レジストリ。backend/src/app/stores.py と店舗IDを一致させること
+# （docker-compose が minrepo_{store_id}_browser.csv をAPIコンテナへマウントする）
+STORES = {
+    "maruhan_kamata7": {
+        "name": "マルハン蒲田7",
+        "tag_url": (
+            "https://min-repo.com/tag/"
+            "%e3%83%9e%e3%83%ab%e3%83%8f%e3%83%b3%e3%83%a1%e3%82%ac"
+            "%e3%82%b7%e3%83%86%e3%82%a32000%e8%92%b2%e7%94%b07/"
+        ),
+    },
+    "bigdipper_togoshiginza": {
+        "name": "BIGディッパー戸越銀座",
+        "tag_url": (
+            "https://min-repo.com/tag/"
+            "%E3%83%93%E3%83%83%E3%82%AF%E3%83%87%E3%82%A3%E3%83%83"
+            "%E3%83%91%E3%83%BC%E6%88%B8%E8%B6%8A%E9%8A%80%E5%BA%A7%E5%BA%97/"
+        ),
+    },
+}
+
 # cron無人実行向け: 日付は毎回自動計算する。
 # TODAY=当日、END_DATE=前日（当日分はまだ店の投稿が出揃っていないため対象外）、
 # START_DATE=END_DATEの6日前（直近7日分を毎回対象にし、実行し忘れがあっても
@@ -32,10 +55,17 @@ HEADERS    = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebK
 IS_VPS = (platform.system() == "Linux" and not os.environ.get("DISPLAY"))
 CHROME_VERSION = 149 if IS_VPS else 148
 
+
+def output_csv(store_id: str) -> str:
+    return f"minrepo_{store_id}_browser.csv"
+
+
 # ------------------------------------------------------------------ #
 # Step1: httpxでURLリスト収集（タグページから全日付を取得）
 # ------------------------------------------------------------------ #
-def collect_date_urls() -> list[tuple[date, str]]:
+def collect_date_urls(
+    tag_url: str, start_date: date, end_date: date
+) -> list[tuple[date, str]]:
     print("=== Step1: URLリスト収集 (httpx) ===")
     result = []
     page = 1
@@ -43,7 +73,7 @@ def collect_date_urls() -> list[tuple[date, str]]:
 
     with httpx.Client(headers=HEADERS, follow_redirects=True) as client:
         while True:
-            url = TAG_URL if page == 1 else TAG_URL + f"page/{page}/"
+            url = tag_url if page == 1 else tag_url + f"page/{page}/"
             r = client.get(url, timeout=30)
             if r.status_code != 200:
                 break
@@ -64,9 +94,9 @@ def collect_date_urls() -> list[tuple[date, str]]:
                         if d <= latest_seen:
                             latest_seen = d
                             found += 1
-                            if d < START_DATE:
+                            if d < start_date:
                                 exceeded = True
-                            elif d <= END_DATE:
+                            elif d <= end_date:
                                 result.append((d, a["href"]))
                             break
                     except ValueError:
@@ -114,12 +144,12 @@ def parse_kishu_all(html: str, target_date: date) -> list[dict]:
     return []
 
 
-def get_done_dates() -> set[str]:
+def get_done_dates(csv_path: str) -> set[str]:
     """既にCSVに保存済みの日付セットを返す（チェックポイント用）"""
-    if not os.path.exists(OUTPUT_CSV):
+    if not os.path.exists(csv_path):
         return set()
     done = set()
-    with open(OUTPUT_CSV, encoding="utf-8-sig") as f:
+    with open(csv_path, encoding="utf-8-sig") as f:
         for line in f:
             parts = line.strip().split(",")
             if parts and len(parts[0]) == 10 and parts[0][0].isdigit():
@@ -127,16 +157,7 @@ def get_done_dates() -> set[str]:
     return done
 
 
-def scrape_all(date_urls: list[tuple[date, str]]):
-    done = get_done_dates()
-    if done:
-        before = len(date_urls)
-        date_urls = [(d, u) for d, u in date_urls if d.isoformat() not in done]
-        print(f"チェックポイント: {len(done)}日分スキップ → 残り{len(date_urls)}日分\n")
-    if not date_urls:
-        print("全日付取得済み。終了。")
-        return
-
+def build_driver():
     if IS_VPS:
         os.environ["DISPLAY"] = ":99"
         print("VPS環境 → DISPLAY=:99 (Xvfb)")
@@ -154,10 +175,13 @@ def scrape_all(date_urls: list[tuple[date, str]]):
     # 先にトップページを1回開いてセッションを確立
     driver.get("https://min-repo.com/")
     time.sleep(2)
+    return driver
 
+
+def scrape_all(driver, date_urls: list[tuple[date, str]], csv_path: str):
     fields = ["date", "model_name", "machine_number", "total_diff", "game_count", "rate"]
-    csv_exists = os.path.exists(OUTPUT_CSV)
-    csvfile = open(OUTPUT_CSV, "a", newline="", encoding="utf-8-sig")
+    csv_exists = os.path.exists(csv_path) and os.path.getsize(csv_path) > 0
+    csvfile = open(csv_path, "a", newline="", encoding="utf-8-sig")
     writer = csv.DictWriter(csvfile, fieldnames=fields)
     if not csv_exists:
         writer.writeheader()
@@ -197,12 +221,57 @@ def scrape_all(date_urls: list[tuple[date, str]]):
         eta = elapsed / i * (total - i)
         print(f"  [{i:3d}/{total}] {target_date} | {status:12s} | {page_sec:4.1f}s/p | 残:{eta:4.0f}s", flush=True)
 
-    driver.quit()
     csvfile.close()
-    print(f"\n完了! {total_rows:,}行 → {OUTPUT_CSV} ({time.time()-t0:.0f}s)")
+    print(f"\n完了! {total_rows:,}行 → {csv_path} ({time.time()-t0:.0f}s)")
+
+
+def parse_args(argv: list[str]) -> tuple[list[str], date, date]:
+    """引数から (対象店舗IDリスト, start_date, end_date) を返す"""
+    store_ids = list(STORES.keys())
+    start, end = START_DATE, END_DATE
+
+    args = argv[1:]
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--start":
+            start = date.fromisoformat(args[i + 1])
+            i += 2
+        elif a == "--end":
+            end = date.fromisoformat(args[i + 1])
+            i += 2
+        elif a in STORES:
+            store_ids = [a]
+            i += 1
+        else:
+            print(f"不明な引数: {a} （店舗ID: {', '.join(STORES)}）")
+            sys.exit(1)
+    return store_ids, start, end
 
 
 if __name__ == "__main__":
-    date_urls = collect_date_urls()
-    if date_urls:
-        scrape_all(date_urls)
+    store_ids, start, end = parse_args(sys.argv)
+    driver = None
+
+    for store_id in store_ids:
+        store = STORES[store_id]
+        csv_path = output_csv(store_id)
+        print(f"\n########## {store['name']} ({store_id}) | {start} 〜 {end} ##########")
+
+        date_urls = collect_date_urls(store["tag_url"], start, end)
+
+        done = get_done_dates(csv_path)
+        if done:
+            before = len(date_urls)
+            date_urls = [(d, u) for d, u in date_urls if d.isoformat() not in done]
+            print(f"チェックポイント: {before - len(date_urls)}日分スキップ → 残り{len(date_urls)}日分\n")
+        if not date_urls:
+            print("全日付取得済み。スキップ。")
+            continue
+
+        if driver is None:
+            driver = build_driver()
+        scrape_all(driver, date_urls, csv_path)
+
+    if driver is not None:
+        driver.quit()
