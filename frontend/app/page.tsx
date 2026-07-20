@@ -28,10 +28,10 @@ interface Summary {
   today: string;
   day_of_week: string;
   event_n: number | null;
-  event_dates: string[];
-  n_event_days: number;
-  top_machines: MachinePick[];
-  top_models: ModelStat[];
+  event_dates?: string[];
+  n_event_days?: number;
+  top_machines?: MachinePick[];
+  top_models?: ModelStat[];
   message?: string;
 }
 
@@ -102,7 +102,9 @@ export default function Dashboard() {
 
   const hasHints = Boolean(hints?.saved_at);
   const hintsPreview = hints?.store_post || hints?.cocochi || "";
-  const top5 = summary.top_machines.slice(0, 5);
+  const topMachines = summary.top_machines ?? [];
+  const topModels = summary.top_models ?? [];
+  const top5 = topMachines.slice(0, 5);
   const latestPrediction = todayPredictions[todayPredictions.length - 1];
 
   return (
@@ -200,8 +202,8 @@ export default function Dashboard() {
             </div>
             <ResponsiveTable
               loading={false}
-              empty={summary.top_machines.length === 0}
-              mobile={summary.top_machines.slice(0, 10).map((m, i) => (
+              empty={topMachines.length === 0}
+              mobile={topMachines.slice(0, 10).map((m, i) => (
                 <div key={m.machine_number} className="px-4 py-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-baseline gap-2 min-w-0">
@@ -230,7 +232,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {summary.top_machines.slice(0, 10).map((m, i) => (
+                    {topMachines.slice(0, 10).map((m, i) => (
                       <tr key={m.machine_number} className="hover:bg-gray-50 transition-colors">
                         <td className="px-3 py-2.5 text-gray-400 text-xs">{i + 1}</td>
                         <td className="px-3 py-2.5 font-bold text-brand">
@@ -266,7 +268,7 @@ export default function Dashboard() {
               </h2>
             </div>
             <div className="p-4 space-y-2">
-              {summary.top_models.slice(0, 12).map((m) => (
+              {topModels.slice(0, 12).map((m) => (
                 <div key={m.model_name} className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-700 truncate">{m.model_name}</p>

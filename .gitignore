@@ -123,6 +123,7 @@ frontend/coverage
 # next.js
 frontend/.next/
 frontend/out/
+frontend/tsconfig.tsbuildinfo
 
 # production
 frontend/build
