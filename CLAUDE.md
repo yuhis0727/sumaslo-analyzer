@@ -151,3 +151,35 @@
 - 着席後の挙動リアルタイム相談（自分で判別できる）
 - 全系を「当てる」高精度予測（昼に外部で判明する）
 ※予測はあくまで「入場時にどこを狙うか」の材料としてのみ使う
+
+---
+
+## 開発・デプロイ運用
+
+### ブランチ運用（必ず守る）
+1. 新しい作業は `git checkout develop && git pull` してから `feature/xxx`・`fix/xxx` ブランチを切る
+2. 実装 → 検証 → コミット → push → **developをベースに**PR作成（ベースブランチ指定を忘れない）
+3. ユーザーの「マージ済み」を待ってから develop を pull し、ローカルブランチを削除
+4. マージ済みブランチ上で次の作業を続けない
+5. `main`・`develop` へ直接pushしない（例外: 本番反映時のmainへのff-onlyマージ）
+
+### 本番反映の流れ
+- `main` = 本番反映してよい状態の印。**mainへのマージは自動デプロイではない**
+- 反映手順: `git checkout main && git merge develop --ff-only && git push origin main`
+  → その後VPS上で `git pull && docker compose -f docker-compose.prod.yml up -d --build`
+- ユーザーから「本番反映して」と言われたらこの一連をSSH経由で実行する
+- 本番はVPS上のDocker Compose 3サービス（api/web/nginx）、nginx層でBasic認証
+- `NEXT_PUBLIC_API_URL` はビルド時埋め込みのため、変更時は必ず `--build` 付き
+- VPSの接続情報・認証情報はリポジトリに書かない（ローカルのメモリ/ユーザー管理）
+
+### データ更新
+- 本番: cronが毎日13:00 JSTに `scripts/scraper.py` を実行 → apiコンテナ自動再起動
+  （APIのCSVキャッシュをクリアするため再起動が必須）
+- ローカル: 手動で `python scripts/scraper.py` 実行後、`docker compose restart api`
+- スクレイパーは日付自動計算（前日までの直近7日、取得済み日はスキップ）
+
+### 検証の原則
+- 修正前に実際に動いているアプリで再現確認、修正後も実アプリで動作確認する
+- コミット前に `pytest`・`ruff check`・`npx tsc --noEmit` を通す
+- Docker: `requirements.txt` 変更後は `docker compose build` が必要
+  （`up -d` だけではイメージは再ビルドされない）
